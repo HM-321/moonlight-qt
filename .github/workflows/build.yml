@@ -18,11 +18,13 @@ concurrency:
 jobs:
   setup:
     runs-on: ubuntu-latest
+
     outputs:
-      ci_version: ${{ steps.set-ci-version.outputs.ci_version }}
+      ci_version: ${{ steps.version.outputs.ci_version }}
+
     steps:
       - name: Set CI version
-        id: set-ci-version
+        id: version
         shell: bash
         run: |
           CI_VERSION="$(echo "${GITHUB_SHA}" | cut -c1-6)"
