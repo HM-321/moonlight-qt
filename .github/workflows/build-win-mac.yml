@@ -17,6 +17,9 @@ jobs:
 
     env:
       CI_VERSION: ${{ inputs.ci_version }}
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 2G
+      CCACHE_COMPRESS: "true"
 
     steps:
       - name: Checkout repository
@@ -34,17 +37,50 @@ jobs:
           version: 6.11.2
           aqtsource: git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e
 
+      - name: Cache macOS dependencies
+        id: deps-cache
+        uses: actions/cache@v4
+        with:
+          path: libs/mac
+          key: moonlight-macos-deps-${{ hashFiles('setup-deps.py') }}
+
       - name: Download macOS dependencies
+        if: steps.deps-cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
           python3 setup-deps.py
+
+      - name: Restore compiler cache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: moonlight-macos-ccache-${{ github.sha }}
+          restore-keys: |
+            moonlight-macos-ccache-
+
+      - name: Configure ccache
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! command -v ccache >/dev/null 2>&1; then
+            brew install ccache
+          fi
+
+          echo "$(brew --prefix ccache)/libexec" >> "${GITHUB_PATH}"
+
+          mkdir -p "${CCACHE_DIR}"
+          ccache --set-config=max_size="${CCACHE_MAXSIZE}"
+          ccache --set-config=compression=true
+          ccache --zero-stats
 
       - name: Build Moonlight
         shell: bash
         run: |
           set -euo pipefail
 
+          rm -rf build
           mkdir -p build
           cd build
 
@@ -54,6 +90,12 @@ jobs:
 
           make -j"$(sysctl -n hw.ncpu)" release
 
+      - name: Show compiler cache statistics
+        if: always()
+        shell: bash
+        run: |
+          ccache --show-stats || true
+
       - name: Deploy application bundle
         shell: bash
         run: |
@@ -62,15 +104,14 @@ jobs:
           APP_PATH="$(find build -type d -name 'Moonlight.app' -print -quit)"
 
           if [[ -z "${APP_PATH}" ]]; then
-            echo "Moonlight.app was not found after build"
+            echo "Moonlight.app was not found"
             find build -maxdepth 6 -print
             exit 1
           fi
 
-          echo "Found app at: ${APP_PATH}"
-
           macdeployqt "${APP_PATH}" \
             -qmldir=app/gui \
+            -appstore-compliant \
             -always-overwrite
 
       - name: Archive Moonlight.app

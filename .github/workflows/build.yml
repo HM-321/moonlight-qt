@@ -6,9 +6,8 @@ permissions:
 
 on:
   push:
-  pull_request:
     branches:
-      - master
+      - feature/macos-key-remapping
   workflow_dispatch:
 
 concurrency:
