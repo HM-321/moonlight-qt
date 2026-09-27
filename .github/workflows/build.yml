@@ -1,5 +1,6 @@
 ---
-name: Build
+name: Build macOS
+
 permissions:
   contents: read
 
@@ -8,9 +9,10 @@ on:
   pull_request:
     branches:
       - master
+  workflow_dispatch:
 
 concurrency:
-  group: build-${{ github.ref }}
+  group: build-macos-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -23,22 +25,10 @@ jobs:
         id: set-ci-version
         shell: bash
         run: |
-          CI_VERSION=`echo ${GITHUB_SHA} | cut -c1-6`
+          CI_VERSION="$(echo "${GITHUB_SHA}" | cut -c1-6)"
           echo "ci_version=${CI_VERSION}" >> "${GITHUB_OUTPUT}"
 
-  build-appimage:
-    needs: setup
-    uses: ./.github/workflows/build-appimage.yml
-    with:
-      ci_version: ${{ needs.setup.outputs.ci_version }}
-
-  build-steamlink:
-    needs: setup
-    uses: ./.github/workflows/build-steamlink.yml
-    with:
-      ci_version: ${{ needs.setup.outputs.ci_version }}
-
-  build-windows-macos:
+  build-macos:
     needs: setup
     uses: ./.github/workflows/build-win-mac.yml
     with:
