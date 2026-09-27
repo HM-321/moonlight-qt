@@ -34,6 +34,12 @@ jobs:
           version: 6.11.2
           aqtsource: git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e
 
+      - name: Download macOS dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 setup-deps.py
+
       - name: Build Moonlight
         shell: bash
         run: |
@@ -46,7 +52,7 @@ jobs:
             CONFIG+=release \
             QMAKE_APPLE_DEVICE_ARCHS=arm64
 
-          make -j"$(sysctl -n hw.ncpu)"
+          make -j"$(sysctl -n hw.ncpu)" release
 
       - name: Deploy application bundle
         shell: bash
