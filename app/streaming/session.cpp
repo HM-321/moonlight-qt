@@ -40,6 +40,7 @@
 #include <QGuiApplication>
 #include <QCursor>
 #include <QScreen>
+#include <QProcess>
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 #include <QQuickOpenGLUtils>
@@ -65,6 +66,52 @@ CONNECTION_LISTENER_CALLBACKS Session::k_ConnCallbacks = {
 
 Session* Session::s_ActiveSession;
 QSemaphore Session::s_ActiveSessionSemaphore(1);
+
+#ifdef Q_OS_DARWIN
+static void setMacStreamingKeyboardMapping(bool enabled)
+{
+    const QString mapping = enabled
+        ? QStringLiteral(R"json({
+            "UserKeyMapping": [
+                {
+                    "HIDKeyboardModifierMappingSrc": 0x700000039,
+                    "HIDKeyboardModifierMappingDst": 0x7000000E0
+                },
+                {
+                    "HIDKeyboardModifierMappingSrc": 0x7000000E0,
+                    "HIDKeyboardModifierMappingDst": 0x700000000
+                }
+            ]
+        })json")
+        : QStringLiteral(R"json({
+            "UserKeyMapping": []
+        })json");
+
+    const int exitCode = QProcess::execute(
+        QStringLiteral("/usr/bin/hidutil"),
+        {
+            QStringLiteral("property"),
+            QStringLiteral("--set"),
+            mapping
+        }
+    );
+
+    if (exitCode != 0) {
+        SDL_LogWarn(
+            SDL_LOG_CATEGORY_APPLICATION,
+            "Failed to update macOS streaming keyboard mapping: %d",
+            exitCode
+        );
+    }
+    else {
+        SDL_LogInfo(
+            SDL_LOG_CATEGORY_APPLICATION,
+            "macOS streaming keyboard mapping: %s",
+            enabled ? "enabled" : "disabled"
+        );
+    }
+}
+#endif
 
 void Session::clStageStarting(int stage)
 {
@@ -1788,6 +1835,10 @@ void Session::exec()
         return;
     }
 
+#ifdef Q_OS_DARWIN
+    setMacStreamingKeyboardMapping(true);
+#endif
+
     // Pump the Qt event loop one last time before we create our SDL window
     // This is sometimes necessary for the QML code to process any signals
     // we've emitted from the async connection thread.
@@ -2308,6 +2359,10 @@ void Session::exec()
     }
 
 DispatchDeferredCleanup:
+#ifdef Q_OS_DARWIN
+    setMacStreamingKeyboardMapping(false);
+#endif
+
     // Switch back to synchronous logging mode
     StreamUtils::exitAsyncLoggingMode();
 
