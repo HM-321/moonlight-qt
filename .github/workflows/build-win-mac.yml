@@ -42,7 +42,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: libs/mac
-          key: moonlight-macos-deps-${{ hashFiles('setup-deps.py') }}
+          key: moonlight-macos-deps-v1-${{ hashFiles('setup-deps.py') }}
 
       - name: Download macOS dependencies
         if: steps.deps-cache.outputs.cache-hit != 'true'
@@ -59,6 +59,14 @@ jobs:
           restore-keys: |
             moonlight-macos-ccache-
 
+      - name: Restore incremental build
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: moonlight-macos-build-v1-${{ github.sha }}
+          restore-keys: |
+            moonlight-macos-build-v1-
+
       - name: Configure ccache
         shell: bash
         run: |
@@ -68,42 +76,38 @@ jobs:
             brew install ccache
           fi
 
-          echo "$(brew --prefix ccache)/libexec" >> "${GITHUB_PATH}"
-
           mkdir -p "${CCACHE_DIR}"
+
           ccache --set-config=max_size="${CCACHE_MAXSIZE}"
           ccache --set-config=compression=true
           ccache --zero-stats
+
+          echo "$(brew --prefix ccache)/libexec" >> "${GITHUB_PATH}"
 
       - name: Build Moonlight
         shell: bash
         run: |
           set -euo pipefail
 
-          rm -rf build
           mkdir -p build
           cd build
 
           qmake ../moonlight-qt.pro \
             CONFIG+=release \
-            QMAKE_APPLE_DEVICE_ARCHS=arm64
+            QMAKE_APPLE_DEVICE_ARCHS=arm64 \
+            "QMAKE_CC=ccache clang" \
+            "QMAKE_CXX=ccache clang++"
 
           make -j"$(sysctl -n hw.ncpu)" release
-
-      - name: Show compiler cache statistics
-        if: always()
-        shell: bash
-        run: |
-          ccache --show-stats || true
 
       - name: Deploy application bundle
         shell: bash
         run: |
           set -euo pipefail
 
-          APP_PATH="$(find build -type d -name 'Moonlight.app' -print -quit)"
+          APP_PATH="build/app/Moonlight.app"
 
-          if [[ -z "${APP_PATH}" ]]; then
+          if [[ ! -d "${APP_PATH}" ]]; then
             echo "Moonlight.app was not found"
             find build -maxdepth 6 -print
             exit 1
@@ -114,18 +118,38 @@ jobs:
             -appstore-compliant \
             -always-overwrite
 
+          echo "Application bundle:"
+          du -sh "${APP_PATH}"
+
+          echo "Frameworks:"
+          ls -lh "${APP_PATH}/Contents/Frameworks" | head -50
+
+      - name: Verify application dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP_PATH="build/app/Moonlight.app"
+          BIN="${APP_PATH}/Contents/MacOS/Moonlight"
+
+          test -x "${BIN}"
+
+          otool -L "${BIN}"
+
+          if otool -L "${BIN}" |
+              grep -E '/Users/runner|/opt/homebrew|/usr/local'; then
+            echo "Absolute build-machine dependency found"
+            exit 1
+          fi
+
       - name: Archive Moonlight.app
         shell: bash
         run: |
           set -euo pipefail
 
-          APP_PATH="$(find build -type d -name 'Moonlight.app' -print -quit)"
+          APP_PATH="build/app/Moonlight.app"
 
-          if [[ -z "${APP_PATH}" ]]; then
-            echo "Moonlight.app was not found"
-            exit 1
-          fi
-
+          rm -rf archive
           mkdir -p archive
 
           ditto \
@@ -137,6 +161,13 @@ jobs:
             "archive/Moonlight-${CI_VERSION}.app.zip"
 
           ls -lh archive
+
+      - name: Show compiler cache statistics
+        if: always()
+        shell: bash
+        run: |
+          ccache --show-stats || true
+          ccache --show-config || true
 
       - name: Upload macOS application
         uses: actions/upload-artifact@v6
