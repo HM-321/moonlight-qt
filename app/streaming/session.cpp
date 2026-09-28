@@ -43,7 +43,9 @@
 #include <QProcess>
 
 #ifdef Q_OS_DARWIN
-#include <IOKit/hidsystem/IOHIDEventSystemClient.h>
+#include <IOKit/IOKitLib.h>
+#include <IOKit/hidsystem/IOHIDLib.h>
+#include <IOKit/hidsystem/IOHIDParameter.h>
 #endif
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
@@ -72,77 +74,180 @@ Session* Session::s_ActiveSession;
 QSemaphore Session::s_ActiveSessionSemaphore(1);
 
 #ifdef Q_OS_DARWIN
-static CFTypeRef s_PreviousMacFKeyMode = nullptr;
+static int s_PreviousMacFKeyMode = 0;
 static bool s_MacFKeyModeChanged = false;
+
+static bool getMacFunctionKeyMode(int& mode)
+{
+    io_registry_entry_t entry = IORegistryEntryFromPath(
+        kIOMainPortDefault,
+        "IOService:/IOResources/IOHIDSystem"
+    );
+
+    if (entry == IO_OBJECT_NULL) {
+        SDL_LogWarn(
+            SDL_LOG_CATEGORY_APPLICATION,
+            "Failed to open the macOS IOHIDSystem registry entry"
+        );
+        return false;
+    }
+
+    CFTypeRef parameters = IORegistryEntryCreateCFProperty(
+        entry,
+        CFSTR("HIDParameters"),
+        kCFAllocatorDefault,
+        0
+    );
+
+    IOObjectRelease(entry);
+
+    if (parameters == nullptr ||
+            CFGetTypeID(parameters) != CFDictionaryGetTypeID()) {
+        if (parameters != nullptr) {
+            CFRelease(parameters);
+        }
+
+        SDL_LogWarn(
+            SDL_LOG_CATEGORY_APPLICATION,
+            "Failed to read macOS HID parameters"
+        );
+        return false;
+    }
+
+    CFTypeRef value = CFDictionaryGetValue(
+        static_cast<CFDictionaryRef>(parameters),
+        CFSTR("HIDFKeyMode")
+    );
+
+    bool success = false;
+
+    if (value != nullptr && CFGetTypeID(value) == CFNumberGetTypeID()) {
+        int currentMode = 0;
+
+        if (CFNumberGetValue(
+                static_cast<CFNumberRef>(value),
+                kCFNumberIntType,
+                &currentMode)) {
+            mode = currentMode;
+            success = true;
+        }
+    }
+
+    CFRelease(parameters);
+
+    if (!success) {
+        SDL_LogWarn(
+            SDL_LOG_CATEGORY_APPLICATION,
+            "Failed to read the current macOS function-key mode"
+        );
+    }
+
+    return success;
+}
+
+static bool setMacFunctionKeyMode(int mode)
+{
+    io_service_t service = IORegistryEntryFromPath(
+        kIOMainPortDefault,
+        "IOService:/IOResources/IOHIDSystem"
+    );
+
+    if (service == IO_OBJECT_NULL) {
+        SDL_LogWarn(
+            SDL_LOG_CATEGORY_APPLICATION,
+            "Failed to locate the macOS IOHIDSystem service"
+        );
+        return false;
+    }
+
+    io_connect_t connection = IO_OBJECT_NULL;
+
+    kern_return_t result = IOServiceOpen(
+        service,
+        mach_task_self(),
+        static_cast<uint32_t>(kIOHIDParamConnectType),
+        &connection
+    );
+
+    IOObjectRelease(service);
+
+    if (result != KERN_SUCCESS) {
+        SDL_LogWarn(
+            SDL_LOG_CATEGORY_APPLICATION,
+            "Failed to open the macOS IOHIDSystem service: 0x%x",
+            result
+        );
+        return false;
+    }
+
+    CFNumberRef value = CFNumberCreate(
+        kCFAllocatorDefault,
+        kCFNumberIntType,
+        &mode
+    );
+
+    result = IOHIDSetCFTypeParameter(
+        connection,
+        CFSTR(kIOHIDFKeyModeKey),
+        value
+    );
+
+    CFRelease(value);
+    IOServiceClose(connection);
+
+    if (result != KERN_SUCCESS) {
+        SDL_LogWarn(
+            SDL_LOG_CATEGORY_APPLICATION,
+            "Failed to set macOS function-key mode: 0x%x",
+            result
+        );
+        return false;
+    }
+
+    return true;
+}
 
 static void setMacStreamingFunctionKeyMode(bool enabled)
 {
-    IOHIDEventSystemClientRef client =
-        IOHIDEventSystemClientCreateSimpleClient(kCFAllocatorDefault);
-
-    if (client == nullptr) {
-        SDL_LogWarn(
-            SDL_LOG_CATEGORY_APPLICATION,
-            "Failed to create macOS HID event-system client"
-        );
-        return;
-    }
-
-    const CFStringRef key = CFSTR("HIDFKeyMode");
-
     if (enabled) {
-        if (!s_MacFKeyModeChanged) {
-            // 現在の設定を保存してから、F1〜F12を標準キーへ変更する
-            s_PreviousMacFKeyMode =
-                IOHIDEventSystemClientCopyProperty(client, key);
-
-            const Boolean success =
-                IOHIDEventSystemClientSetProperty(
-                    client,
-                    key,
-                    kCFBooleanTrue
-                );
-
-            if (success) {
-                s_MacFKeyModeChanged = true;
-
-                SDL_LogInfo(
-                    SDL_LOG_CATEGORY_APPLICATION,
-                    "macOS standard function-key mode: enabled"
-                );
-            }
-            else {
-                if (s_PreviousMacFKeyMode != nullptr) {
-                    CFRelease(s_PreviousMacFKeyMode);
-                    s_PreviousMacFKeyMode = nullptr;
-                }
-
-                SDL_LogWarn(
-                    SDL_LOG_CATEGORY_APPLICATION,
-                    "Failed to enable macOS standard function-key mode"
-                );
-            }
+        if (s_MacFKeyModeChanged) {
+            return;
         }
+
+        int previousMode = 0;
+
+        if (!getMacFunctionKeyMode(previousMode)) {
+            return;
+        }
+
+        // Fluor defines media mode as 0 and standard function keys as 1.
+        if (!setMacFunctionKeyMode(1)) {
+            return;
+        }
+
+        s_PreviousMacFKeyMode = previousMode;
+        s_MacFKeyModeChanged = true;
+
+        SDL_LogInfo(
+            SDL_LOG_CATEGORY_APPLICATION,
+            "macOS standard function-key mode: enabled "
+            "(previous mode: %d)",
+            previousMode
+        );
     }
-    else if (s_MacFKeyModeChanged) {
-        // 保存した設定へ戻す。取得できなかった場合はMac標準動作へ戻す
-        CFTypeRef restoreValue =
-            s_PreviousMacFKeyMode != nullptr
-                ? s_PreviousMacFKeyMode
-                : kCFBooleanFalse;
+    else {
+        if (!s_MacFKeyModeChanged) {
+            return;
+        }
 
-        const Boolean success =
-            IOHIDEventSystemClientSetProperty(
-                client,
-                key,
-                restoreValue
-            );
-
-        if (success) {
+        if (setMacFunctionKeyMode(s_PreviousMacFKeyMode)) {
             SDL_LogInfo(
                 SDL_LOG_CATEGORY_APPLICATION,
-                "macOS standard function-key mode: restored"
+                "macOS standard function-key mode: restored to %d",
+                s_PreviousMacFKeyMode
             );
+
+            s_MacFKeyModeChanged = false;
         }
         else {
             SDL_LogWarn(
@@ -150,16 +255,7 @@ static void setMacStreamingFunctionKeyMode(bool enabled)
                 "Failed to restore macOS function-key mode"
             );
         }
-
-        if (s_PreviousMacFKeyMode != nullptr) {
-            CFRelease(s_PreviousMacFKeyMode);
-            s_PreviousMacFKeyMode = nullptr;
-        }
-
-        s_MacFKeyModeChanged = false;
     }
-
-    CFRelease(client);
 }
 
 static void setMacStreamingKeyboardMapping(bool enabled)
