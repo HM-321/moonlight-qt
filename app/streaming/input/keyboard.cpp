@@ -204,6 +204,28 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
                 static_cast<unsigned int>(event->keysym.mod));
 #endif
 
+#ifdef Q_OS_DARWIN
+    // Apply a Mac-to-Windows keyboard layout while streaming.
+    //
+    // Caps Lock -> Left Control
+    // Left Control -> disabled
+    //
+    // Language 1 and Language 2 are handled later by the existing
+    // Windows Japanese keyboard conversion logic.
+    if (event->keysym.scancode == SDL_SCANCODE_LCTRL) {
+        return;
+    }
+
+    if (event->keysym.scancode == SDL_SCANCODE_CAPSLOCK) {
+        event->keysym.scancode = SDL_SCANCODE_LCTRL;
+        event->keysym.sym = SDLK_LCTRL;
+
+        // Do not forward the toggled macOS Caps Lock modifier state.
+        event->keysym.mod =
+            static_cast<SDL_Keymod>(event->keysym.mod & ~KMOD_CAPS);
+    }
+#endif
+
     if (event->repeat) {
         // Ignore repeat key down events
         SDL_assert(event->state == SDL_PRESSED);
