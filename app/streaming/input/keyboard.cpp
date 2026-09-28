@@ -189,7 +189,7 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
     char flags;
     bool shouldNotConvertToScanCodeOnServer = false;
 
-#ifdef Q_OS_MACOS
+#ifdef Q_OS_DARWIN
     // Temporary diagnostics for identifying macOS/JIS keyboard events.
     // Keep this before repeat filtering so we can determine whether macOS or SDL
     // reports special keys as repeats or unusual press/release sequences.
