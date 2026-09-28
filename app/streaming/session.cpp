@@ -43,6 +43,7 @@
 #include <QProcess>
 
 #ifdef Q_OS_DARWIN
+#include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
 #include <IOKit/hidsystem/IOHIDLib.h>
 #include <IOKit/hidsystem/IOHIDParameter.h>
