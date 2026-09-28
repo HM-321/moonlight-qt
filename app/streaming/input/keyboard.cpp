@@ -189,21 +189,6 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
     char flags;
     bool shouldNotConvertToScanCodeOnServer = false;
 
-#ifdef Q_OS_DARWIN
-    // Temporary diagnostics for identifying macOS/JIS keyboard events.
-    // Keep this before repeat filtering so we can determine whether macOS or SDL
-    // reports special keys as repeats or unusual press/release sequences.
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "macOS key event: state=%s repeat=%d scancode=%d (%s) keycode=%d (%s) mod=0x%04x",
-                event->state == SDL_PRESSED ? "pressed" : "released",
-                event->repeat,
-                static_cast<int>(event->keysym.scancode),
-                SDL_GetScancodeName(event->keysym.scancode),
-                static_cast<int>(event->keysym.sym),
-                SDL_GetKeyName(event->keysym.sym),
-                static_cast<unsigned int>(event->keysym.mod));
-#endif
-
     if (event->repeat) {
         // Ignore repeat key down events
         SDL_assert(event->state == SDL_PRESSED);

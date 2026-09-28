@@ -2027,7 +2027,9 @@ void Session::exec()
     }
 
 #ifdef Q_OS_DARWIN
-    setMacStreamingKeyboardMapping(true);
+    if (m_Preferences->macKeyboardCompatibility) {
+        setMacStreamingKeyboardMapping(true);
+    }
 #endif
 
     // Pump the Qt event loop one last time before we create our SDL window
@@ -2291,7 +2293,9 @@ void Session::exec()
                     m_AudioMuted = true;
                 }
 #ifdef Q_OS_DARWIN
-                setMacStreamingFunctionKeyMode(false);
+                if (m_Preferences->macFunctionKeysOnFocus) {
+                    setMacStreamingFunctionKeyMode(false);
+                }
 #endif
                 m_InputHandler->notifyFocusLost();
                 break;
@@ -2300,7 +2304,9 @@ void Session::exec()
                     m_AudioMuted = false;
                 }
 #ifdef Q_OS_DARWIN
-                setMacStreamingFunctionKeyMode(true);
+                if (m_Preferences->macFunctionKeysOnFocus) {
+                    setMacStreamingFunctionKeyMode(true);
+                }
 #endif
                 m_InputHandler->notifyFocusGained();
                 break;
@@ -2557,6 +2563,8 @@ void Session::exec()
 
 DispatchDeferredCleanup:
 #ifdef Q_OS_DARWIN
+    // These helpers are safe to call even if the corresponding
+    // feature was disabled or never activated.
     setMacStreamingFunctionKeyMode(false);
     setMacStreamingKeyboardMapping(false);
 #endif
