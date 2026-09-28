@@ -2026,6 +2026,7 @@ void Session::exec()
         return;
     }
 
+
 #ifdef Q_OS_DARWIN
     if (m_Preferences->macKeyboardCompatibility) {
         setMacStreamingKeyboardMapping(true);
@@ -2292,22 +2293,31 @@ void Session::exec()
                 if (m_Preferences->muteOnFocusLoss) {
                     m_AudioMuted = true;
                 }
+
+                // Release remote modifiers before changing the macOS key map.
+                // This prevents Caps Lock remapped as Control from remaining
+                // logically pressed after Moonlight loses focus.
+                m_InputHandler->raiseAllKeys();
+
 #ifdef Q_OS_DARWIN
                 if (m_Preferences->macFunctionKeysOnFocus) {
                     setMacStreamingFunctionKeyMode(false);
                 }
 #endif
+
                 m_InputHandler->notifyFocusLost();
                 break;
             case SDL_WINDOWEVENT_FOCUS_GAINED:
                 if (m_Preferences->muteOnFocusLoss) {
                     m_AudioMuted = false;
                 }
+
 #ifdef Q_OS_DARWIN
                 if (m_Preferences->macFunctionKeysOnFocus) {
                     setMacStreamingFunctionKeyMode(true);
                 }
 #endif
+
                 m_InputHandler->notifyFocusGained();
                 break;
             case SDL_WINDOWEVENT_LEAVE:
@@ -2562,6 +2572,11 @@ void Session::exec()
     }
 
 DispatchDeferredCleanup:
+    // Release all remote keys before restoring the local macOS key map.
+    if (m_InputHandler != nullptr) {
+        m_InputHandler->raiseAllKeys();
+    }
+
 #ifdef Q_OS_DARWIN
     // These helpers are safe to call even if the corresponding
     // feature was disabled or never activated.
