@@ -2028,7 +2028,6 @@ void Session::exec()
 
 #ifdef Q_OS_DARWIN
     setMacStreamingKeyboardMapping(true);
-    setMacStreamingFunctionKeyMode(true);
 #endif
 
     // Pump the Qt event loop one last time before we create our SDL window
@@ -2291,12 +2290,18 @@ void Session::exec()
                 if (m_Preferences->muteOnFocusLoss) {
                     m_AudioMuted = true;
                 }
+#ifdef Q_OS_DARWIN
+                setMacStreamingFunctionKeyMode(false);
+#endif
                 m_InputHandler->notifyFocusLost();
                 break;
             case SDL_WINDOWEVENT_FOCUS_GAINED:
                 if (m_Preferences->muteOnFocusLoss) {
                     m_AudioMuted = false;
                 }
+#ifdef Q_OS_DARWIN
+                setMacStreamingFunctionKeyMode(true);
+#endif
                 m_InputHandler->notifyFocusGained();
                 break;
             case SDL_WINDOWEVENT_LEAVE:
