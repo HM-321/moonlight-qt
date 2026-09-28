@@ -42,6 +42,10 @@
 #include <QScreen>
 #include <QProcess>
 
+#ifdef Q_OS_DARWIN
+#include <IOKit/hidsystem/IOHIDEventSystemClient.h>
+#endif
+
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 #include <QQuickOpenGLUtils>
 #endif
@@ -68,6 +72,96 @@ Session* Session::s_ActiveSession;
 QSemaphore Session::s_ActiveSessionSemaphore(1);
 
 #ifdef Q_OS_DARWIN
+static CFTypeRef s_PreviousMacFKeyMode = nullptr;
+static bool s_MacFKeyModeChanged = false;
+
+static void setMacStreamingFunctionKeyMode(bool enabled)
+{
+    IOHIDEventSystemClientRef client =
+        IOHIDEventSystemClientCreateSimpleClient(kCFAllocatorDefault);
+
+    if (client == nullptr) {
+        SDL_LogWarn(
+            SDL_LOG_CATEGORY_APPLICATION,
+            "Failed to create macOS HID event-system client"
+        );
+        return;
+    }
+
+    const CFStringRef key = CFSTR("HIDFKeyMode");
+
+    if (enabled) {
+        if (!s_MacFKeyModeChanged) {
+            // 現在の設定を保存してから、F1〜F12を標準キーへ変更する
+            s_PreviousMacFKeyMode =
+                IOHIDEventSystemClientCopyProperty(client, key);
+
+            const Boolean success =
+                IOHIDEventSystemClientSetProperty(
+                    client,
+                    key,
+                    kCFBooleanTrue
+                );
+
+            if (success) {
+                s_MacFKeyModeChanged = true;
+
+                SDL_LogInfo(
+                    SDL_LOG_CATEGORY_APPLICATION,
+                    "macOS standard function-key mode: enabled"
+                );
+            }
+            else {
+                if (s_PreviousMacFKeyMode != nullptr) {
+                    CFRelease(s_PreviousMacFKeyMode);
+                    s_PreviousMacFKeyMode = nullptr;
+                }
+
+                SDL_LogWarn(
+                    SDL_LOG_CATEGORY_APPLICATION,
+                    "Failed to enable macOS standard function-key mode"
+                );
+            }
+        }
+    }
+    else if (s_MacFKeyModeChanged) {
+        // 保存した設定へ戻す。取得できなかった場合はMac標準動作へ戻す
+        CFTypeRef restoreValue =
+            s_PreviousMacFKeyMode != nullptr
+                ? s_PreviousMacFKeyMode
+                : kCFBooleanFalse;
+
+        const Boolean success =
+            IOHIDEventSystemClientSetProperty(
+                client,
+                key,
+                restoreValue
+            );
+
+        if (success) {
+            SDL_LogInfo(
+                SDL_LOG_CATEGORY_APPLICATION,
+                "macOS standard function-key mode: restored"
+            );
+        }
+        else {
+            SDL_LogWarn(
+                SDL_LOG_CATEGORY_APPLICATION,
+                "Failed to restore macOS function-key mode"
+            );
+        }
+
+        if (s_PreviousMacFKeyMode != nullptr) {
+            CFRelease(s_PreviousMacFKeyMode);
+            s_PreviousMacFKeyMode = nullptr;
+        }
+
+        s_MacFKeyModeChanged = false;
+    }
+
+    CFRelease(client);
+}
+
 static void setMacStreamingKeyboardMapping(bool enabled)
 {
     const QString mapping = enabled
@@ -1837,6 +1931,7 @@ void Session::exec()
 
 #ifdef Q_OS_DARWIN
     setMacStreamingKeyboardMapping(true);
+    setMacStreamingFunctionKeyMode(true);
 #endif
 
     // Pump the Qt event loop one last time before we create our SDL window
@@ -2360,6 +2455,7 @@ void Session::exec()
 
 DispatchDeferredCleanup:
 #ifdef Q_OS_DARWIN
+    setMacStreamingFunctionKeyMode(false);
     setMacStreamingKeyboardMapping(false);
 #endif
 
