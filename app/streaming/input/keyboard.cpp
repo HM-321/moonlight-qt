@@ -487,10 +487,23 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
                 keyCode = 0xE2;
                 break;
             case SDL_SCANCODE_LANG1:
-                keyCode = 0x1C;
+#ifdef Q_OS_DARWIN
+                // macOS Kana key: always enable the Windows IME.
+                keyCode = 0x16; // VK_IME_ON
+                shouldNotConvertToScanCodeOnServer = true;
+#else
+                keyCode = 0x1C; // VK_CONVERT
+#endif
                 break;
+
             case SDL_SCANCODE_LANG2:
-                keyCode = 0x1D;
+#ifdef Q_OS_DARWIN
+                // macOS Eisu key: always disable the Windows IME.
+                keyCode = 0x1A; // VK_IME_OFF
+                shouldNotConvertToScanCodeOnServer = true;
+#else
+                keyCode = 0x1D; // VK_NONCONVERT
+#endif
                 break;
             default:
                 SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
