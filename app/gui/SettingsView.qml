@@ -1440,7 +1440,7 @@ Flickable {
                     ToolTip.timeout: 10000
                     ToolTip.visible: hovered
                     ToolTip.text: qsTr(
-                        "Maps Caps Lock to Control and disables the original left Control key while streaming."
+                        "Maps Caps Lock to Control while streaming. The original left Control key remains available."
                     )
                 }
 
