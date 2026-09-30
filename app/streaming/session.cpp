@@ -40,6 +40,14 @@
 #include <QGuiApplication>
 #include <QCursor>
 #include <QScreen>
+#include <QProcess>
+
+#ifdef Q_OS_DARWIN
+#include <CoreFoundation/CoreFoundation.h>
+#include <IOKit/IOKitLib.h>
+#include <IOKit/hidsystem/IOHIDLib.h>
+#include <IOKit/hidsystem/IOHIDParameter.h>
+#endif
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 #include <QQuickOpenGLUtils>
@@ -65,6 +73,232 @@ CONNECTION_LISTENER_CALLBACKS Session::k_ConnCallbacks = {
 
 Session* Session::s_ActiveSession;
 QSemaphore Session::s_ActiveSessionSemaphore(1);
+
+#ifdef Q_OS_DARWIN
+static int s_PreviousMacFKeyMode = 0;
+static bool s_MacFKeyModeChanged = false;
+
+static bool getMacFunctionKeyMode(int& mode)
+{
+    io_registry_entry_t entry = IORegistryEntryFromPath(
+        kIOMainPortDefault,
+        "IOService:/IOResources/IOHIDSystem"
+    );
+
+    if (entry == IO_OBJECT_NULL) {
+        SDL_LogWarn(
+            SDL_LOG_CATEGORY_APPLICATION,
+            "Failed to open the macOS IOHIDSystem registry entry"
+        );
+        return false;
+    }
+
+    CFTypeRef parameters = IORegistryEntryCreateCFProperty(
+        entry,
+        CFSTR("HIDParameters"),
+        kCFAllocatorDefault,
+        0
+    );
+
+    IOObjectRelease(entry);
+
+    if (parameters == nullptr ||
+            CFGetTypeID(parameters) != CFDictionaryGetTypeID()) {
+        if (parameters != nullptr) {
+            CFRelease(parameters);
+        }
+
+        SDL_LogWarn(
+            SDL_LOG_CATEGORY_APPLICATION,
+            "Failed to read macOS HID parameters"
+        );
+        return false;
+    }
+
+    CFTypeRef value = CFDictionaryGetValue(
+        static_cast<CFDictionaryRef>(parameters),
+        CFSTR("HIDFKeyMode")
+    );
+
+    bool success = false;
+
+    if (value != nullptr && CFGetTypeID(value) == CFNumberGetTypeID()) {
+        int currentMode = 0;
+
+        if (CFNumberGetValue(
+                static_cast<CFNumberRef>(value),
+                kCFNumberIntType,
+                &currentMode)) {
+            mode = currentMode;
+            success = true;
+        }
+    }
+
+    CFRelease(parameters);
+
+    if (!success) {
+        SDL_LogWarn(
+            SDL_LOG_CATEGORY_APPLICATION,
+            "Failed to read the current macOS function-key mode"
+        );
+    }
+
+    return success;
+}
+
+static bool setMacFunctionKeyMode(int mode)
+{
+    io_service_t service = IORegistryEntryFromPath(
+        kIOMainPortDefault,
+        "IOService:/IOResources/IOHIDSystem"
+    );
+
+    if (service == IO_OBJECT_NULL) {
+        SDL_LogWarn(
+            SDL_LOG_CATEGORY_APPLICATION,
+            "Failed to locate the macOS IOHIDSystem service"
+        );
+        return false;
+    }
+
+    io_connect_t connection = IO_OBJECT_NULL;
+
+    kern_return_t result = IOServiceOpen(
+        service,
+        mach_task_self(),
+        static_cast<uint32_t>(kIOHIDParamConnectType),
+        &connection
+    );
+
+    IOObjectRelease(service);
+
+    if (result != KERN_SUCCESS) {
+        SDL_LogWarn(
+            SDL_LOG_CATEGORY_APPLICATION,
+            "Failed to open the macOS IOHIDSystem service: 0x%x",
+            result
+        );
+        return false;
+    }
+
+    CFNumberRef value = CFNumberCreate(
+        kCFAllocatorDefault,
+        kCFNumberIntType,
+        &mode
+    );
+
+    result = IOHIDSetCFTypeParameter(
+        connection,
+        CFSTR(kIOHIDFKeyModeKey),
+        value
+    );
+
+    CFRelease(value);
+    IOServiceClose(connection);
+
+    if (result != KERN_SUCCESS) {
+        SDL_LogWarn(
+            SDL_LOG_CATEGORY_APPLICATION,
+            "Failed to set macOS function-key mode: 0x%x",
+            result
+        );
+        return false;
+    }
+
+    return true;
+}
+
+static void setMacStreamingFunctionKeyMode(bool enabled)
+{
+    if (enabled) {
+        if (s_MacFKeyModeChanged) {
+            return;
+        }
+
+        int previousMode = 0;
+
+        if (!getMacFunctionKeyMode(previousMode)) {
+            return;
+        }
+
+        // Fluor defines media mode as 0 and standard function keys as 1.
+        if (!setMacFunctionKeyMode(1)) {
+            return;
+        }
+
+        s_PreviousMacFKeyMode = previousMode;
+        s_MacFKeyModeChanged = true;
+
+        SDL_LogInfo(
+            SDL_LOG_CATEGORY_APPLICATION,
+            "macOS standard function-key mode: enabled "
+            "(previous mode: %d)",
+            previousMode
+        );
+    }
+    else {
+        if (!s_MacFKeyModeChanged) {
+            return;
+        }
+
+        if (setMacFunctionKeyMode(s_PreviousMacFKeyMode)) {
+            SDL_LogInfo(
+                SDL_LOG_CATEGORY_APPLICATION,
+                "macOS standard function-key mode: restored to %d",
+                s_PreviousMacFKeyMode
+            );
+
+            s_MacFKeyModeChanged = false;
+        }
+        else {
+            SDL_LogWarn(
+                SDL_LOG_CATEGORY_APPLICATION,
+                "Failed to restore macOS function-key mode"
+            );
+        }
+    }
+}
+
+static void setMacStreamingKeyboardMapping(bool enabled)
+{
+    const QString mapping = enabled
+        ? QStringLiteral(R"json({
+            "UserKeyMapping": [
+                {
+                    "HIDKeyboardModifierMappingSrc": 0x700000039,
+                    "HIDKeyboardModifierMappingDst": 0x7000000E0
+                }
+            ]
+        })json")
+        : QStringLiteral(R"json({
+            "UserKeyMapping": []
+        })json");
+
+    const int exitCode = QProcess::execute(
+        QStringLiteral("/usr/bin/hidutil"),
+        {
+            QStringLiteral("property"),
+            QStringLiteral("--set"),
+            mapping
+        }
+    );
+
+    if (exitCode != 0) {
+        SDL_LogWarn(
+            SDL_LOG_CATEGORY_APPLICATION,
+            "Failed to update macOS streaming keyboard mapping: %d",
+            exitCode
+        );
+    }
+    else {
+        SDL_LogInfo(
+            SDL_LOG_CATEGORY_APPLICATION,
+            "macOS streaming keyboard mapping: %s",
+            enabled ? "enabled" : "disabled"
+        );
+    }
+}
+#endif
 
 void Session::clStageStarting(int stage)
 {
@@ -1788,6 +2022,13 @@ void Session::exec()
         return;
     }
 
+
+#ifdef Q_OS_DARWIN
+    if (m_Preferences->macKeyboardCompatibility) {
+        setMacStreamingKeyboardMapping(true);
+    }
+#endif
+
     // Pump the Qt event loop one last time before we create our SDL window
     // This is sometimes necessary for the QML code to process any signals
     // we've emitted from the async connection thread.
@@ -2048,12 +2289,31 @@ void Session::exec()
                 if (m_Preferences->muteOnFocusLoss) {
                     m_AudioMuted = true;
                 }
+
+                // Release remote modifiers before changing the macOS key map.
+                // This prevents Caps Lock remapped as Control from remaining
+                // logically pressed after Moonlight loses focus.
+                m_InputHandler->raiseAllKeys();
+
+#ifdef Q_OS_DARWIN
+                if (m_Preferences->macFunctionKeysOnFocus) {
+                    setMacStreamingFunctionKeyMode(false);
+                }
+#endif
+
                 m_InputHandler->notifyFocusLost();
                 break;
             case SDL_WINDOWEVENT_FOCUS_GAINED:
                 if (m_Preferences->muteOnFocusLoss) {
                     m_AudioMuted = false;
                 }
+
+#ifdef Q_OS_DARWIN
+                if (m_Preferences->macFunctionKeysOnFocus) {
+                    setMacStreamingFunctionKeyMode(true);
+                }
+#endif
+
                 m_InputHandler->notifyFocusGained();
                 break;
             case SDL_WINDOWEVENT_LEAVE:
@@ -2308,6 +2568,18 @@ void Session::exec()
     }
 
 DispatchDeferredCleanup:
+    // Release all remote keys before restoring the local macOS key map.
+    if (m_InputHandler != nullptr) {
+        m_InputHandler->raiseAllKeys();
+    }
+
+#ifdef Q_OS_DARWIN
+    // These helpers are safe to call even if the corresponding
+    // feature was disabled or never activated.
+    setMacStreamingFunctionKeyMode(false);
+    setMacStreamingKeyboardMapping(false);
+#endif
+
     // Switch back to synchronous logging mode
     StreamUtils::exitAsyncLoggingMode();
 

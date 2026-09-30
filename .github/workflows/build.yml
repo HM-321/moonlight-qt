@@ -1,44 +1,35 @@
 ---
-name: Build
+name: Build macOS
+
 permissions:
   contents: read
 
 on:
   push:
-  pull_request:
     branches:
-      - master
+      - feature/macos-key-remapping
+  workflow_dispatch:
 
 concurrency:
-  group: build-${{ github.ref }}
+  group: build-macos-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   setup:
     runs-on: ubuntu-latest
+
     outputs:
-      ci_version: ${{ steps.set-ci-version.outputs.ci_version }}
+      ci_version: ${{ steps.version.outputs.ci_version }}
+
     steps:
       - name: Set CI version
-        id: set-ci-version
+        id: version
         shell: bash
         run: |
-          CI_VERSION=`echo ${GITHUB_SHA} | cut -c1-6`
+          CI_VERSION="$(echo "${GITHUB_SHA}" | cut -c1-6)"
           echo "ci_version=${CI_VERSION}" >> "${GITHUB_OUTPUT}"
 
-  build-appimage:
-    needs: setup
-    uses: ./.github/workflows/build-appimage.yml
-    with:
-      ci_version: ${{ needs.setup.outputs.ci_version }}
-
-  build-steamlink:
-    needs: setup
-    uses: ./.github/workflows/build-steamlink.yml
-    with:
-      ci_version: ${{ needs.setup.outputs.ci_version }}
-
-  build-windows-macos:
+  build-macos:
     needs: setup
     uses: ./.github/workflows/build-win-mac.yml
     with:

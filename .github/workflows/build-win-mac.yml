@@ -1,5 +1,6 @@
 ---
-name: Build - Windows and macOS
+name: Build macOS App ZIP
+
 permissions:
   contents: read
 
@@ -12,115 +13,166 @@ on:
 
 jobs:
   build:
+    runs-on: macos-26
+
     env:
       CI_VERSION: ${{ inputs.ci_version }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # Windows
-          - os: windows-2025
-            qt_version: 6.11.2
-          # macOS
-          - os: macos-26
-            qt_version: 6.11.2
-
-    runs-on: ${{ matrix.os }}
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 2G
+      CCACHE_COMPRESS: "true"
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v5
         with:
-          submodules: 'recursive'
+          submodules: recursive
           fetch-depth: 1
-
-      - name: Download dependencies (Windows)
-        if: runner.os == 'Windows'
-        run: powershell ./setup-deps.ps1
-
-      - name: Install create-dmg (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew install node
-          npm install --global create-dmg
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
           cache: true
-          set-env: ${{ runner.os != 'Windows' }}
-          add-tools-to-path: ${{ runner.os != 'Windows' }}
-          tools: ${{ runner.os == 'Windows' && 'tools_qtcreator_gui' || '' }}
-          version: ${{ matrix.qt_version }}
-          aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e'
+          set-env: true
+          add-tools-to-path: true
+          version: 6.11.2
+          aqtsource: git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e
 
-      - name: Install Qt ARM64 (Windows)
-        if: runner.os == 'Windows'
-        uses: jurplel/install-qt-action@v4
+      - name: Cache macOS dependencies
+        id: deps-cache
+        uses: actions/cache@v4
         with:
-          cache: true
-          set-env: false
-          add-tools-to-path: false
-          arch: win64_msvc2022_arm64_cross_compiled
-          version: ${{ matrix.qt_version }}
+          path: libs/mac
+          key: moonlight-macos-deps-v1-${{ hashFiles('setup-deps.py') }}
 
-      - name: Build x64 binaries (Windows)
-        if: runner.os == 'Windows'
-        shell: cmd
+      - name: Download macOS dependencies
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        shell: bash
         run: |
-          set "PATH=%QT_PATH%;%PATH%"
-          scripts\build-arch.bat Release x64
-        env:
-          QT_PATH: ${{ runner.workspace }}\Qt\${{ matrix.qt_version }}\msvc2022_64\bin
+          set -euo pipefail
+          python3 setup-deps.py
 
-      - name: Build ARM64 binaries (Windows)
-        if: runner.os == 'Windows'
-        shell: cmd
+      - name: Restore compiler cache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: moonlight-macos-ccache-${{ github.sha }}
+          restore-keys: |
+            moonlight-macos-ccache-
+
+      - name: Restore incremental build
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: moonlight-macos-build-v1-${{ github.sha }}
+          restore-keys: |
+            moonlight-macos-build-v1-
+
+      - name: Configure ccache
+        shell: bash
         run: |
-          set "PATH=%QT_PATH%;%PATH%"
-          scripts\build-arch.bat Release arm64
-        env:
-          QT_PATH: ${{ runner.workspace }}\Qt\${{ matrix.qt_version }}\msvc2022_arm64\bin
+          set -euo pipefail
 
-      - name: Build Package
-        shell: pwsh
+          if ! command -v ccache >/dev/null 2>&1; then
+            brew install ccache
+          fi
+
+          mkdir -p "${CCACHE_DIR}"
+
+          ccache --set-config=max_size="${CCACHE_MAXSIZE}"
+          ccache --set-config=compression=true
+          ccache --zero-stats
+
+          echo "$(brew --prefix ccache)/libexec" >> "${GITHUB_PATH}"
+
+      - name: Build Moonlight
+        shell: bash
         run: |
-          if ($Env:RUNNER_OS -eq "Windows") {
-            cmd /c scripts\generate-bundle.bat Release
-          } else {
-            bash scripts/generate-dmg.sh Release
-          }
+          set -euo pipefail
 
-      - name: Upload Binaries (Windows x64)
-        uses: actions/upload-artifact@v6
-        if: runner.os == 'Windows'
-        with:
-          name: Moonlight-${{ runner.os }}-x64-${{ env.CI_VERSION }}
-          path: build/deploy-x64-release/*
-          if-no-files-found: error
+          mkdir -p build
+          cd build
 
-      - name: Upload Binaries (Windows arm64)
-        uses: actions/upload-artifact@v6
-        if: runner.os == 'Windows'
-        with:
-          name: Moonlight-${{ runner.os }}-arm64-${{ env.CI_VERSION }}
-          path: build/deploy-arm64-release/*
-          if-no-files-found: error
+          qmake ../moonlight-qt.pro \
+            CONFIG+=release \
+            QMAKE_APPLE_DEVICE_ARCHS=arm64 \
+            "QMAKE_CC=ccache clang" \
+            "QMAKE_CXX=ccache clang++"
 
-      - name: Upload Binaries (macOS)
+          make -j"$(sysctl -n hw.ncpu)" release
+
+      - name: Deploy application bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP_PATH="build/app/Moonlight.app"
+
+          if [[ ! -d "${APP_PATH}" ]]; then
+            echo "Moonlight.app was not found"
+            find build -maxdepth 6 -print
+            exit 1
+          fi
+
+          macdeployqt "${APP_PATH}" \
+            -qmldir=app/gui \
+            -appstore-compliant \
+            -always-overwrite
+
+          echo "Application bundle:"
+          du -sh "${APP_PATH}"
+
+          echo "Frameworks:"
+          ls -lh "${APP_PATH}/Contents/Frameworks" | head -50
+
+      - name: Verify application dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP_PATH="build/app/Moonlight.app"
+          BIN="${APP_PATH}/Contents/MacOS/Moonlight"
+
+          test -x "${BIN}"
+
+          otool -L "${BIN}"
+
+          if otool -L "${BIN}" |
+              grep -E '/Users/runner|/opt/homebrew|/usr/local'; then
+            echo "Absolute build-machine dependency found"
+            exit 1
+          fi
+
+      - name: Archive Moonlight.app
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP_PATH="build/app/Moonlight.app"
+
+          rm -rf archive
+          mkdir -p archive
+
+          ditto \
+            -c \
+            -k \
+            --sequesterRsrc \
+            --keepParent \
+            "${APP_PATH}" \
+            "archive/Moonlight-${CI_VERSION}.app.zip"
+
+          ls -lh archive
+
+      - name: Show compiler cache statistics
+        if: always()
+        shell: bash
+        run: |
+          ccache --show-stats || true
+          ccache --show-config || true
+
+      - name: Upload macOS application
         uses: actions/upload-artifact@v6
-        if: runner.os == 'macOS'
         with:
-          name: Moonlight-${{ runner.os }}-${{ env.CI_VERSION }}
-          path: build/installer-Release/*.dmg
+          name: Moonlight-macOS-App-${{ env.CI_VERSION }}
+          path: archive/Moonlight-${{ env.CI_VERSION }}.app.zip
           compression-level: 0
-          if-no-files-found: error
-
-      - name: Upload Symbols
-        uses: actions/upload-artifact@v6
-        with:
-          name: zDevDbgSyms-${{ runner.os }}-${{ env.CI_VERSION }}
-          path: |
-            build/installer-*/*.dsym/*
-            build/symbols-*/*.pdb
           if-no-files-found: error

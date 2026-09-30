@@ -1423,6 +1423,52 @@ Flickable {
                 }
 
                 CheckBox {
+                    id: macKeyboardCompatibilityCheck
+                    hoverEnabled: true
+                    width: parent.width
+                    visible: Qt.platform.os === "osx"
+                    text: qsTr("Use macOS keyboard compatibility mode")
+                    font.pointSize: 12
+                    checked: StreamingPreferences.macKeyboardCompatibility
+
+                    onCheckedChanged: {
+                        StreamingPreferences.macKeyboardCompatibility =
+                            checked
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 10000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr(
+                        "Maps Caps Lock to Control while streaming. The original left Control key remains available."
+                    )
+                }
+
+                CheckBox {
+                    id: macFunctionKeysOnFocusCheck
+                    hoverEnabled: true
+                    width: parent.width
+                    visible: Qt.platform.os === "osx"
+                    text: qsTr(
+                        "Use standard function keys while the stream is focused"
+                    )
+                    font.pointSize: 12
+                    checked: StreamingPreferences.macFunctionKeysOnFocus
+
+                    onCheckedChanged: {
+                        StreamingPreferences.macFunctionKeysOnFocus =
+                            checked
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 10000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr(
+                        "Sends F1 through F12 to the host while the streaming window is focused and restores the normal macOS media-key behavior when focus is lost."
+                    )
+                }
+
+                CheckBox {
                     id: absoluteTouchCheck
                     hoverEnabled: true
                     width: parent.width
