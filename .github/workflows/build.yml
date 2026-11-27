@@ -36,23 +36,9 @@ jobs:
           CI_VERSION=`echo ${GITHUB_SHA} | cut -c1-6`
           echo "ci_version=${CI_VERSION}" >> "${GITHUB_OUTPUT}"
 
-  build-appimage:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_target == 'all' }}
-    needs: setup
-    uses: ./.github/workflows/build-appimage.yml
-    with:
-      ci_version: ${{ needs.setup.outputs.ci_version }}
-
-  build-steamlink:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_target == 'all' }}
-    needs: setup
-    uses: ./.github/workflows/build-steamlink.yml
-    with:
-      ci_version: ${{ needs.setup.outputs.ci_version }}
-
-  build-windows-macos:
+  build-macos:
     needs: setup
     uses: ./.github/workflows/build-win-mac.yml
     with:
       ci_version: ${{ needs.setup.outputs.ci_version }}
-      target: ${{ github.event_name == 'workflow_dispatch' && inputs.build_target || 'all' }}
+      target: macos

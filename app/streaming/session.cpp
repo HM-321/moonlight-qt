@@ -2142,7 +2142,7 @@ void Session::exec()
                 }
                 m_InputHandler->notifyFocusLost();
                 break;
-            case SDL_WINDOWEVENT_FOCUS_GAINED:
+            case SDL_WINDOWEVENT_FOCUS_GAINED: {
 #ifdef Q_OS_DARWIN
                 if (m_MacFunctionKeysOnFocus) {
                     m_MacFunctionKeyMode.setStreamingActive(true);
@@ -2170,6 +2170,7 @@ void Session::exec()
                 }
                 m_InputHandler->notifyFocusGained();
                 break;
+            }
             case SDL_WINDOWEVENT_LEAVE:
                 m_InputHandler->notifyMouseLeave();
                 break;
