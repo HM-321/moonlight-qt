@@ -275,6 +275,11 @@ void SdlInputHandler::setWindow(SDL_Window *window)
     m_Window = window;
 }
 
+void SdlInputHandler::setMacHidCapsLockTarget(SDL_Scancode scancode)
+{
+    m_MacHidCapsLockTarget = scancode;
+}
+
 void SdlInputHandler::notifyFocusLost()
 {
     // Release mouse cursor when another window is activated (e.g. by using ALT+TAB).

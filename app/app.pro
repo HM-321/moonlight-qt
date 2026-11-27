@@ -166,7 +166,11 @@ macx {
 
     SOURCES += streaming/macfunctionkeymode.mm
     SOURCES += streaming/maccapslockmode.mm
-    HEADERS += streaming/macfunctionkeymode.h streaming/maccapslockmode.h
+    SOURCES += streaming/maccapslockmapping.mm
+    HEADERS += \
+        streaming/macfunctionkeymode.h \
+        streaming/maccapslockmode.h \
+        streaming/maccapslockmapping.h
 }
 
 SOURCES += \

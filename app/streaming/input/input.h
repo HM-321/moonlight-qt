@@ -94,6 +94,8 @@ public:
 
     void setWindow(SDL_Window* window);
 
+    void setMacHidCapsLockTarget(SDL_Scancode scancode);
+
     void handleKeyEvent(SDL_KeyboardEvent* event);
 
     void handleMouseButtonEvent(SDL_MouseButtonEvent* event);
@@ -194,8 +196,6 @@ private:
 
     bool handleSpecialKeyComboIfAny(SDL_KeyboardEvent* event);
 
-    void flushPendingModifierKeyDowns();
-
     void handleKeyEventDirect(SDL_KeyboardEvent* event, bool mapped = false);
 
     void handleMappedKeyEvent(SDL_KeyboardEvent* event, const KeyboardMapping& mapping);
@@ -232,10 +232,10 @@ private:
     GamepadState m_GamepadState[MAX_GAMEPADS];
     QSet<uint32_t> m_KeysDown;
     QList<KeyboardMapping> m_KeyboardMappings;
-    QHash<SDL_Scancode, SDL_KeyboardEvent> m_PendingModifierKeyDowns;
     QSet<SDL_Scancode> m_ConsumedModifierKeyUps;
     QSet<SDL_Scancode> m_ForwardedModifierKeys;
     QHash<SDL_Scancode, KeyboardMapping> m_ActiveKeyboardMappings;
+    SDL_Scancode m_MacHidCapsLockTarget = SDL_SCANCODE_UNKNOWN;
     bool m_MacJapaneseInputKeys;
     bool m_BypassKeyboardMappings;
     bool m_ProcessingMappedKey;

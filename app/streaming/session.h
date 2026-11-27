@@ -14,6 +14,7 @@
 #ifdef Q_OS_DARWIN
 #include "macfunctionkeymode.h"
 #include "maccapslockmode.h"
+#include "maccapslockmapping.h"
 #endif
 
 class SupportedVideoFormatList : public QList<int>
@@ -265,6 +266,7 @@ private:
 #ifdef Q_OS_DARWIN
     MacFunctionKeyMode m_MacFunctionKeyMode;
     MacCapsLockMode m_MacCapsLockMode;
+    MacCapsLockMapping m_MacCapsLockMapping;
     bool m_MacFunctionKeysOnFocus;
     bool m_DisableMacCapsLock;
 #endif

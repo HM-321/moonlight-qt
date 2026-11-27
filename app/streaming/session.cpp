@@ -66,6 +66,30 @@ CONNECTION_LISTENER_CALLBACKS Session::k_ConnCallbacks = {
 Session* Session::s_ActiveSession;
 QSemaphore Session::s_ActiveSessionSemaphore(1);
 
+#ifdef Q_OS_DARWIN
+static SDL_Scancode macCapsLockModifierTarget(const QString& hostUuid)
+{
+    SDL_Scancode targetKey = SDL_SCANCODE_UNKNOWN;
+    int capsLockMappings = 0;
+    const QList<KeyboardMapping> mappings = KeyboardMappingStore::load(hostUuid);
+    for (const KeyboardMapping& mapping : mappings) {
+        if (mapping.sourceKey != SDL_SCANCODE_CAPSLOCK) {
+            continue;
+        }
+
+        capsLockMappings++;
+        if (mapping.sourceModifiers != 0 ||
+                mapping.targetModifiers != 0 ||
+                KeyboardMappingStore::modifierForScancode(mapping.targetKey) == 0) {
+            return SDL_SCANCODE_UNKNOWN;
+        }
+        targetKey = mapping.targetKey;
+    }
+
+    return capsLockMappings == 1 ? targetKey : SDL_SCANCODE_UNKNOWN;
+}
+#endif
+
 void Session::clStageStarting(int stage)
 {
     // We know this is called on the same thread as LiStartConnection()
@@ -1901,6 +1925,17 @@ void Session::exec()
     m_InputHandler->setWindow(m_Window);
 
 #ifdef Q_OS_DARWIN
+    const SDL_Scancode capsLockTarget = macCapsLockModifierTarget(m_Computer->uuid);
+    if (capsLockTarget != SDL_SCANCODE_UNKNOWN) {
+        if (m_MacCapsLockMapping.activate(capsLockTarget)) {
+            m_InputHandler->setMacHidCapsLockTarget(capsLockTarget);
+        }
+        else {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "Caps Lock modifier mapping is unavailable; using SDL key mapping");
+        }
+    }
+
     if (m_MacFunctionKeysOnFocus &&
         (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS)) {
         m_MacFunctionKeyMode.setStreamingActive(true);
@@ -2366,7 +2401,6 @@ void Session::exec()
 DispatchDeferredCleanup:
 #ifdef Q_OS_DARWIN
     m_MacFunctionKeyMode.setStreamingActive(false);
-    m_MacCapsLockMode.setStreamingActive(false);
 #endif
 
     // Switch back to synchronous logging mode
@@ -2383,6 +2417,11 @@ DispatchDeferredCleanup:
 
     // Raise any keys that are still down
     m_InputHandler->raiseAllKeys();
+
+#ifdef Q_OS_DARWIN
+    m_MacCapsLockMapping.restore();
+    m_MacCapsLockMode.setStreamingActive(false);
+#endif
 
     // Destroy the input handler now. This must be destroyed
     // before allowwing the UI to continue execution or it could
