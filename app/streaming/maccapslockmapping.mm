@@ -220,7 +220,7 @@ bool MacCapsLockMapping::activate(SDL_Scancode targetKey)
             entry.value(QStringLiteral("HIDKeyboardModifierMappingSrc")).toDouble());
         const quint64 destination = static_cast<quint64>(
             entry.value(QStringLiteral("HIDKeyboardModifierMappingDst")).toDouble());
-        if (source == kCapsLockHidUsage && destination == kCapsLockHidSentinelUsage) {
+        if (source == kCapsLockHidUsage && destination == targetUsage) {
             mappingInstalled = true;
             break;
         }
@@ -228,7 +228,7 @@ bool MacCapsLockMapping::activate(SDL_Scancode targetKey)
 
     if (!mappingInstalled) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "Temporary Caps Lock to F24 HID mapping was not installed");
+                     "Temporary Caps Lock HID modifier mapping was not installed");
         restore();
         return false;
     }
