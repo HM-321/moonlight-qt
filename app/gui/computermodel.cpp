@@ -119,9 +119,14 @@ QHash<int, QByteArray> ComputerModel::roleNames() const
     return names;
 }
 
-QVariantList ComputerModel::keyboardMappingKeys() const
+QVariantList ComputerModel::keyboardMappingSourceKeys() const
 {
-    return KeyboardMappingStore::supportedKeys();
+    return KeyboardMappingStore::supportedSourceKeys();
+}
+
+QVariantList ComputerModel::keyboardMappingTargetKeys() const
+{
+    return KeyboardMappingStore::supportedTargetKeys();
 }
 
 QVariantList ComputerModel::getKeyboardMappings(const QString& hostUuid) const
@@ -143,7 +148,8 @@ QVariantMap ComputerModel::getHostKeyboardSettings(const QString& hostUuid) cons
     const HostKeyboardSettings settings = KeyboardMappingStore::loadHostSettings(hostUuid);
     return {
         {QStringLiteral("macFunctionKeysOnFocus"), settings.macFunctionKeysOnFocus},
-        {QStringLiteral("disableMacCapsLock"), settings.disableMacCapsLock}
+        {QStringLiteral("disableMacCapsLock"), settings.disableMacCapsLock},
+        {QStringLiteral("macJapaneseInputKeys"), settings.macJapaneseInputKeys}
     };
 }
 
@@ -168,6 +174,8 @@ bool ComputerModel::saveKeyboardConfiguration(const QString& hostUuid,
         hostSettings.value(QStringLiteral("macFunctionKeysOnFocus")).toBool();
     parsedHostSettings.disableMacCapsLock =
         hostSettings.value(QStringLiteral("disableMacCapsLock")).toBool();
+    parsedHostSettings.macJapaneseInputKeys =
+        hostSettings.value(QStringLiteral("macJapaneseInputKeys")).toBool();
 
     return KeyboardMappingStore::saveConfiguration(hostUuid,
                                                    parsedMappings,

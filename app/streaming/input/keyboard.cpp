@@ -6,6 +6,13 @@
 #define VK_0 0x30
 #define VK_A 0x41
 
+#ifndef VK_DBE_ALPHANUMERIC
+#define VK_DBE_ALPHANUMERIC 0xF0
+#endif
+#ifndef VK_DBE_HIRAGANA
+#define VK_DBE_HIRAGANA 0xF2
+#endif
+
 // These are real Windows VK_* codes
 #ifndef VK_F1
 #define VK_F1 0x70
@@ -623,10 +630,24 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
                 keyCode = 0xE2;
                 break;
             case SDL_SCANCODE_LANG1:
+#ifdef Q_OS_DARWIN
+                keyCode = m_MacJapaneseInputKeys ? VK_DBE_HIRAGANA : 0x1C;
+#else
                 keyCode = 0x1C;
+#endif
                 break;
             case SDL_SCANCODE_LANG2:
+#ifdef Q_OS_DARWIN
+                keyCode = m_MacJapaneseInputKeys ? VK_DBE_ALPHANUMERIC : 0x1D;
+#else
                 keyCode = 0x1D;
+#endif
+                break;
+            case SDL_SCANCODE_LANG4:
+                keyCode = VK_DBE_HIRAGANA;
+                break;
+            case SDL_SCANCODE_LANG5:
+                keyCode = VK_DBE_ALPHANUMERIC;
                 break;
             default:
                 SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,

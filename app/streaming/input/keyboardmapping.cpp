@@ -48,13 +48,115 @@ static QList<SDL_Scancode> supportedScancodes()
         SDL_SCANCODE_SLASH, SDL_SCANCODE_GRAVE, SDL_SCANCODE_LEFTBRACKET,
         SDL_SCANCODE_BACKSLASH, SDL_SCANCODE_RIGHTBRACKET, SDL_SCANCODE_APOSTROPHE,
         SDL_SCANCODE_INTERNATIONAL1, SDL_SCANCODE_INTERNATIONAL3,
-        SDL_SCANCODE_NONUSBACKSLASH, SDL_SCANCODE_LANG1, SDL_SCANCODE_LANG2
+        SDL_SCANCODE_NONUSBACKSLASH
     };
     for (SDL_Scancode scancode : specialScancodes) {
         scancodes.append(scancode);
     }
 
     return scancodes;
+}
+
+static QList<SDL_Scancode> supportedSourceScancodes()
+{
+    QList<SDL_Scancode> scancodes = supportedScancodes();
+    scancodes.append(SDL_SCANCODE_LANG2);
+    scancodes.append(SDL_SCANCODE_LANG1);
+    return scancodes;
+}
+
+static QList<SDL_Scancode> supportedTargetScancodes()
+{
+    QList<SDL_Scancode> scancodes = supportedScancodes();
+    scancodes.append(SDL_SCANCODE_LANG5);
+    scancodes.append(SDL_SCANCODE_LANG4);
+    return scancodes;
+}
+
+static QString scancodeName(SDL_Scancode scancode, bool target)
+{
+    switch (scancode) {
+    case SDL_SCANCODE_LALT:
+        if (target) {
+            return QStringLiteral("Left Alt");
+        }
+#ifdef Q_OS_DARWIN
+        return QStringLiteral("Left Option");
+#else
+        break;
+#endif
+    case SDL_SCANCODE_RALT:
+        if (target) {
+            return QStringLiteral("Right Alt");
+        }
+#ifdef Q_OS_DARWIN
+        return QStringLiteral("Right Option");
+#else
+        break;
+#endif
+    case SDL_SCANCODE_LGUI:
+        if (target) {
+            return QStringLiteral("Left Windows");
+        }
+#ifdef Q_OS_DARWIN
+        return QStringLiteral("Left Command");
+#else
+        break;
+#endif
+    case SDL_SCANCODE_RGUI:
+        if (target) {
+            return QStringLiteral("Right Windows");
+        }
+#ifdef Q_OS_DARWIN
+        return QStringLiteral("Right Command");
+#else
+        break;
+#endif
+    case SDL_SCANCODE_LANG1:
+#ifdef Q_OS_DARWIN
+        return QStringLiteral("Kana (かな)");
+#else
+        break;
+#endif
+    case SDL_SCANCODE_LANG2:
+#ifdef Q_OS_DARWIN
+        return QStringLiteral("Eisu (英数)");
+#else
+        break;
+#endif
+    case SDL_SCANCODE_LANG4:
+        if (target) {
+            return QStringLiteral("Hiragana (かな)");
+        }
+        break;
+    case SDL_SCANCODE_LANG5:
+        if (target) {
+            return QStringLiteral("Alphanumeric (英数)");
+        }
+        break;
+    default:
+        break;
+    }
+
+    const char* name = SDL_GetScancodeName(scancode);
+    return name != nullptr ? QString::fromUtf8(name) : QString();
+}
+
+static QVariantList supportedKeys(const QList<SDL_Scancode>& scancodes, bool target)
+{
+    QVariantList keys;
+    for (SDL_Scancode scancode : scancodes) {
+        const QString name = scancodeName(scancode, target);
+        if (name.isEmpty()) {
+            continue;
+        }
+
+        QVariantMap key;
+        key.insert(QStringLiteral("name"), name);
+        key.insert(QStringLiteral("code"), static_cast<int>(scancode));
+        keys.append(key);
+    }
+    return keys;
 }
 
 QList<KeyboardMapping> KeyboardMappingStore::load(const QString& hostUuid)
@@ -82,8 +184,8 @@ QList<KeyboardMapping> KeyboardMappingStore::load(const QString& hostUuid)
         const quint32 sourceChord = (static_cast<quint32>(mapping.sourceKey) << 4) |
                                     static_cast<quint32>(mapping.sourceModifiers);
 
-        if (!isSupportedKey(mapping.sourceKey) ||
-                !isSupportedKey(mapping.targetKey) ||
+        if (!isSupportedSourceKey(mapping.sourceKey) ||
+                !isSupportedTargetKey(mapping.targetKey) ||
                 (mapping.sourceModifiers & ~ModifierMask) != 0 ||
                 (mapping.targetModifiers & ~ModifierMask) != 0 ||
                 sourceChords.contains(sourceChord)) {
@@ -117,6 +219,8 @@ HostKeyboardSettings KeyboardMappingStore::loadHostSettings(const QString& hostU
         settings.value(QStringLiteral("macFunctionKeysOnFocus"), legacyFunctionKeySetting).toBool();
     hostSettings.disableMacCapsLock =
         settings.value(QStringLiteral("disableMacCapsLock"), false).toBool();
+    hostSettings.macJapaneseInputKeys =
+        settings.value(QStringLiteral("macJapaneseInputKeys"), true).toBool();
     if (!hasHostFunctionKeySetting) {
         settings.setValue(QStringLiteral("macFunctionKeysOnFocus"), hostSettings.macFunctionKeysOnFocus);
         if (settings.status() != QSettings::NoError) {
@@ -141,8 +245,8 @@ bool KeyboardMappingStore::saveConfiguration(const QString& hostUuid,
     for (const KeyboardMapping& mapping : mappings) {
         const quint32 sourceChord = (static_cast<quint32>(mapping.sourceKey) << 4) |
                                     static_cast<quint32>(mapping.sourceModifiers);
-        if (!isSupportedKey(mapping.sourceKey) ||
-                !isSupportedKey(mapping.targetKey) ||
+        if (!isSupportedSourceKey(mapping.sourceKey) ||
+                !isSupportedTargetKey(mapping.targetKey) ||
                 (mapping.sourceModifiers & ~ModifierMask) != 0 ||
                 (mapping.targetModifiers & ~ModifierMask) != 0 ||
                 sourceChords.contains(sourceChord)) {
@@ -168,6 +272,7 @@ bool KeyboardMappingStore::saveConfiguration(const QString& hostUuid,
     settings.endArray();
     settings.setValue(QStringLiteral("macFunctionKeysOnFocus"), hostSettings.macFunctionKeysOnFocus);
     settings.setValue(QStringLiteral("disableMacCapsLock"), hostSettings.disableMacCapsLock);
+    settings.setValue(QStringLiteral("macJapaneseInputKeys"), hostSettings.macJapaneseInputKeys);
     settings.endGroup();
     settings.endGroup();
 
@@ -190,26 +295,24 @@ void KeyboardMappingStore::remove(const QString& hostUuid)
     settings.endGroup();
 }
 
-QVariantList KeyboardMappingStore::supportedKeys()
+QVariantList KeyboardMappingStore::supportedSourceKeys()
 {
-    QVariantList keys;
-    for (SDL_Scancode scancode : supportedScancodes()) {
-        const char* name = SDL_GetScancodeName(scancode);
-        if (name == nullptr || *name == '\0') {
-            continue;
-        }
-
-        QVariantMap key;
-        key.insert(QStringLiteral("name"), QString::fromUtf8(name));
-        key.insert(QStringLiteral("code"), static_cast<int>(scancode));
-        keys.append(key);
-    }
-    return keys;
+    return supportedKeys(supportedSourceScancodes(), false);
 }
 
-bool KeyboardMappingStore::isSupportedKey(SDL_Scancode scancode)
+QVariantList KeyboardMappingStore::supportedTargetKeys()
 {
-    return supportedScancodes().contains(scancode);
+    return supportedKeys(supportedTargetScancodes(), true);
+}
+
+bool KeyboardMappingStore::isSupportedSourceKey(SDL_Scancode scancode)
+{
+    return supportedSourceScancodes().contains(scancode);
+}
+
+bool KeyboardMappingStore::isSupportedTargetKey(SDL_Scancode scancode)
+{
+    return supportedTargetScancodes().contains(scancode);
 }
 
 int KeyboardMappingStore::modifiersFromSdl(Uint16 modifiers)

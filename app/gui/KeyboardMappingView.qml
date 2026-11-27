@@ -11,12 +11,14 @@ Item {
     property var computerModel
     property string computerUuid
     property string computerName
-    property var keyOptions: []
+    property var sourceKeyOptions: []
+    property var targetKeyOptions: []
     property var mappings: []
     property string statusText: ""
     property bool saveSucceeded: false
     property bool macFunctionKeysOnFocus: false
     property bool disableMacCapsLock: false
+    property bool macJapaneseInputKeys: true
     property var sourceModifierOptions: makeModifierOptions(true)
     property var targetModifierOptions: makeModifierOptions(false)
 
@@ -43,10 +45,10 @@ Item {
         return options
     }
 
-    function keyIndex(code)
+    function keyIndex(options, code)
     {
-        for (var i = 0; i < keyOptions.length; i++) {
-            if (keyOptions[i].code === code) {
+        for (var i = 0; i < options.length; i++) {
+            if (options[i].code === code) {
                 return i
             }
         }
@@ -78,15 +80,14 @@ Item {
 
     function addMapping()
     {
-        if (keyOptions.length === 0) {
+        if (sourceKeyOptions.length === 0 || targetKeyOptions.length === 0) {
             return
         }
 
-        var key = keyOptions[0].code
         mappings = mappings.concat([{
-            "sourceKey": key,
+            "sourceKey": sourceKeyOptions[0].code,
             "sourceModifiers": 0,
-            "targetKey": key,
+            "targetKey": targetKeyOptions[0].code,
             "targetModifiers": 0
         }])
     }
@@ -103,7 +104,8 @@ Item {
     {
         var hostSettings = {
             "macFunctionKeysOnFocus": macFunctionKeysOnFocus,
-            "disableMacCapsLock": disableMacCapsLock
+            "disableMacCapsLock": disableMacCapsLock,
+            "macJapaneseInputKeys": macJapaneseInputKeys
         }
         if (!computerModel.saveKeyboardConfiguration(computerUuid, mappings, hostSettings)) {
             statusText = qsTr("Could not save mappings. Each input shortcut must be unique.")
@@ -116,11 +118,13 @@ Item {
     }
 
     Component.onCompleted: {
-        keyOptions = computerModel.keyboardMappingKeys()
+        sourceKeyOptions = computerModel.keyboardMappingSourceKeys()
+        targetKeyOptions = computerModel.keyboardMappingTargetKeys()
         mappings = computerModel.getKeyboardMappings(computerUuid)
         var hostSettings = computerModel.getHostKeyboardSettings(computerUuid)
         macFunctionKeysOnFocus = hostSettings.macFunctionKeysOnFocus
         disableMacCapsLock = hostSettings.disableMacCapsLock
+        macJapaneseInputKeys = hostSettings.macJapaneseInputKeys
     }
 
     ColumnLayout {
@@ -137,7 +141,7 @@ Item {
         }
 
         Label {
-            text: qsTr("Map any input key or combination to a Windows key or combination, including modifier keys. Unmapped keys pass through unchanged.")
+            text: qsTr("Map a Mac key or combination to a Windows key or combination. Source and target key choices are listed separately. Unmapped keys pass through unchanged.")
             font.pointSize: 12
             Layout.fillWidth: true
             wrapMode: Text.Wrap
@@ -185,6 +189,19 @@ Item {
                             ToolTip.visible: hovered
                             ToolTip.text: qsTr("Prevents Caps Lock from lighting on the Mac while this stream is focused. The key is still sent to the Windows host, and the previous Mac state is restored when focus leaves or the stream ends.")
                         }
+
+                        CheckBox {
+                            visible: SystemProperties.isDarwin
+                            hoverEnabled: true
+                            text: qsTr("Use Mac Eisu/Kana keys for Japanese input")
+                            checked: root.macJapaneseInputKeys
+                            onCheckedChanged: root.macJapaneseInputKeys = checked
+
+                            ToolTip.delay: 1000
+                            ToolTip.timeout: 10000
+                            ToolTip.visible: hovered
+                            ToolTip.text: qsTr("Sends Eisu as the Windows Alphanumeric mode key and Kana as the Hiragana mode key, not Convert/Nonconvert.")
+                        }
                     }
                 }
 
@@ -205,7 +222,7 @@ Item {
                                 Layout.fillWidth: true
 
                                 Label {
-                                    text: qsTr("When")
+                                    text: qsTr("From")
                                     Layout.preferredWidth: 75
                                 }
 
@@ -219,10 +236,10 @@ Item {
 
                                 ComboBox {
                                     Layout.fillWidth: true
-                                    model: root.keyOptions
+                                    model: root.sourceKeyOptions
                                     textRole: "name"
-                                    Component.onCompleted: currentIndex = root.keyIndex(mappingData.sourceKey)
-                                    onActivated: root.updateMapping(rowIndex, "sourceKey", root.keyOptions[currentIndex].code)
+                                    Component.onCompleted: currentIndex = root.keyIndex(root.sourceKeyOptions, mappingData.sourceKey)
+                                    onActivated: root.updateMapping(rowIndex, "sourceKey", root.sourceKeyOptions[currentIndex].code)
                                 }
                             }
 
@@ -230,7 +247,7 @@ Item {
                                 Layout.fillWidth: true
 
                                 Label {
-                                    text: qsTr("Send as")
+                                    text: qsTr("To")
                                     Layout.preferredWidth: 75
                                 }
 
@@ -244,10 +261,10 @@ Item {
 
                                 ComboBox {
                                     Layout.fillWidth: true
-                                    model: root.keyOptions
+                                    model: root.targetKeyOptions
                                     textRole: "name"
-                                    Component.onCompleted: currentIndex = root.keyIndex(mappingData.targetKey)
-                                    onActivated: root.updateMapping(rowIndex, "targetKey", root.keyOptions[currentIndex].code)
+                                    Component.onCompleted: currentIndex = root.keyIndex(root.targetKeyOptions, mappingData.targetKey)
+                                    onActivated: root.updateMapping(rowIndex, "targetKey", root.targetKeyOptions[currentIndex].code)
                                 }
 
                                 Button {

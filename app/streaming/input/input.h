@@ -236,6 +236,7 @@ private:
     QSet<SDL_Scancode> m_ConsumedModifierKeyUps;
     QSet<SDL_Scancode> m_ForwardedModifierKeys;
     QHash<SDL_Scancode, KeyboardMapping> m_ActiveKeyboardMappings;
+    bool m_MacJapaneseInputKeys;
     bool m_BypassKeyboardMappings;
     bool m_ProcessingMappedKey;
     bool m_FakeMouseCaptureActive;

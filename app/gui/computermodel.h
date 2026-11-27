@@ -45,7 +45,9 @@ public:
 
     Q_INVOKABLE void renameComputer(int computerIndex, QString name);
 
-    Q_INVOKABLE QVariantList keyboardMappingKeys() const;
+    Q_INVOKABLE QVariantList keyboardMappingSourceKeys() const;
+
+    Q_INVOKABLE QVariantList keyboardMappingTargetKeys() const;
 
     Q_INVOKABLE QVariantList getKeyboardMappings(const QString& hostUuid) const;
 

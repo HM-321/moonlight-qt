@@ -1344,20 +1344,20 @@
         <translation>%1 のキー割り当て</translation>
     </message>
     <message>
-        <source>Map any input key or combination to a Windows key or combination, including modifier keys. Unmapped keys pass through unchanged.</source>
-        <translation>修飾キーを含む任意の入力キーや組み合わせをWindowsのキーや組み合わせに割り当てます。未設定のキーはそのまま送信されます。</translation>
+        <source>Map a Mac key or combination to a Windows key or combination. Source and target key choices are listed separately. Unmapped keys pass through unchanged.</source>
+        <translation>Macのキーや組み合わせをWindowsのキーや組み合わせに割り当てます。入力元と割り当て先のキーは別々に表示されます。未設定のキーはそのまま送信されます。</translation>
     </message>
     <message>
         <source>Mapping %1</source>
         <translation>割り当て %1</translation>
     </message>
     <message>
-        <source>When</source>
-        <translation>入力</translation>
+        <source>From</source>
+        <translation>入力元</translation>
     </message>
     <message>
-        <source>Send as</source>
-        <translation>送信先</translation>
+        <source>To</source>
+        <translation>割り当て先</translation>
     </message>
     <message>
         <source>Remove</source>
@@ -1398,6 +1398,14 @@
     <message>
         <source>Prevents Caps Lock from lighting on the Mac while this stream is focused. The key is still sent to the Windows host, and the previous Mac state is restored when focus leaves or the stream ends.</source>
         <translation>ストリーミングにフォーカスがある間、MacのCaps Lockランプを消灯したままにします。キー入力はWindowsホストにも送信され、フォーカスが外れるかストリーミングが終了するとMac側の元の状態に戻ります。</translation>
+    </message>
+    <message>
+        <source>Use Mac Eisu/Kana keys for Japanese input</source>
+        <translation>Macの英数／かなキーで日本語入力を切り替える</translation>
+    </message>
+    <message>
+        <source>Sends Eisu as the Windows Alphanumeric mode key and Kana as the Hiragana mode key, not Convert/Nonconvert.</source>
+        <translation>英数キーをWindowsの英数モードキーとして、かなキーをひらがなモードキーとして送信します。変換／無変換キーとしては送信しません。</translation>
     </message>
 </context>
 </TS>

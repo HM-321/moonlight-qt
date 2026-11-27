@@ -18,6 +18,7 @@ struct HostKeyboardSettings
 {
     bool macFunctionKeysOnFocus = false;
     bool disableMacCapsLock = false;
+    bool macJapaneseInputKeys = true;
 };
 
 class KeyboardMappingStore
@@ -38,8 +39,10 @@ public:
                                   const QList<KeyboardMapping>& mappings,
                                   const HostKeyboardSettings& hostSettings);
     static void remove(const QString& hostUuid);
-    static QVariantList supportedKeys();
-    static bool isSupportedKey(SDL_Scancode scancode);
+    static QVariantList supportedSourceKeys();
+    static QVariantList supportedTargetKeys();
+    static bool isSupportedSourceKey(SDL_Scancode scancode);
+    static bool isSupportedTargetKey(SDL_Scancode scancode);
     static int modifiersFromSdl(Uint16 modifiers);
     static SDL_Keymod modifiersToSdl(int modifiers);
     static int modifierForScancode(SDL_Scancode scancode);

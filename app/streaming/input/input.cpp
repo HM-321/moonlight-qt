@@ -36,6 +36,7 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_NumFingersDown(0)
 {
     m_KeyboardMappings = KeyboardMappingStore::load(hostUuid);
+    m_MacJapaneseInputKeys = KeyboardMappingStore::loadHostSettings(hostUuid).macJapaneseInputKeys;
     m_BypassKeyboardMappings = false;
     m_ProcessingMappedKey = false;
 
