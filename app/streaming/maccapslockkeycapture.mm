@@ -2,14 +2,15 @@
 
 #include "input/keyboardmapping.h"
 
-#include <AppKit/AppKit.h>
-#include <ApplicationServices/ApplicationServices.h>
+#include <IOKit/hid/IOHIDManager.h>
 #include <SDL.h>
 
 namespace {
 
-constexpr unsigned short kCapsLockKeyCode = 0x39;
-id s_CapsLockMonitor;
+constexpr uint32_t kKeyboardUsagePage = 0x07;
+constexpr uint32_t kCapsLockUsage = 0x39;
+
+IOHIDManagerRef s_HidManager;
 bool s_CapsLockDown;
 
 void pushCapsLockSentinel(bool down)
@@ -35,51 +36,92 @@ void pushCapsLockSentinel(bool down)
                 down ? "down" : "up");
 }
 
+void handleHidValue(void*, IOReturn, void*, IOHIDValueRef value)
+{
+    IOHIDElementRef element = IOHIDValueGetElement(value);
+    if (IOHIDElementGetUsagePage(element) != kKeyboardUsagePage ||
+            IOHIDElementGetUsage(element) != kCapsLockUsage) {
+        return;
+    }
+
+    // IOHID reports the physical switch value: 1 on press and 0 immediately
+    // on release. Unlike the macOS Caps Lock flag, this is not toggle state.
+    const bool down = IOHIDValueGetIntegerValue(value) != 0;
+    if (down == s_CapsLockDown) {
+        return;
+    }
+
+    s_CapsLockDown = down;
+    pushCapsLockSentinel(down);
+}
+
+void stopCapture()
+{
+    if (s_HidManager != nullptr) {
+        IOHIDManagerUnscheduleFromRunLoop(s_HidManager,
+                                          CFRunLoopGetMain(),
+                                          kCFRunLoopCommonModes);
+        IOHIDManagerClose(s_HidManager, kIOHIDOptionsTypeNone);
+        CFRelease(s_HidManager);
+        s_HidManager = nullptr;
+    }
+
+    if (s_CapsLockDown) {
+        s_CapsLockDown = false;
+        pushCapsLockSentinel(false);
+    }
+}
+
 }
 
 bool MacCapsLockKeyCapture::setStreamingActive(bool active)
 {
     if (!active) {
-        if (s_CapsLockMonitor != nil) {
-            [NSEvent removeMonitor:s_CapsLockMonitor];
-            s_CapsLockMonitor = nil;
-        }
-        if (s_CapsLockDown) {
-            s_CapsLockDown = false;
-            pushCapsLockSentinel(false);
-        }
+        stopCapture();
         return true;
     }
 
-    if (s_CapsLockMonitor != nil) {
+    if (s_HidManager != nullptr) {
         return true;
     }
 
-    s_CapsLockDown = CGEventSourceKeyState(kCGEventSourceStateHIDSystemState,
-                                            kCapsLockKeyCode);
-    s_CapsLockMonitor =
-        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskFlagsChanged
-                                              handler:^NSEvent*(NSEvent* event) {
-        if ([event keyCode] != kCapsLockKeyCode) {
-            return event;
-        }
-
-        const bool down = CGEventSourceKeyState(kCGEventSourceStateHIDSystemState,
-                                                 kCapsLockKeyCode);
-        if (down != s_CapsLockDown) {
-            s_CapsLockDown = down;
-            pushCapsLockSentinel(down);
-        }
-
-        // Prevent Caps Lock from toggling the local macOS state while streaming.
-        return nil;
-    }];
-
-    if (s_CapsLockMonitor == nil) {
+    s_HidManager = IOHIDManagerCreate(kCFAllocatorDefault, kIOHIDOptionsTypeNone);
+    if (s_HidManager == nullptr) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "Unable to capture physical macOS Caps Lock events");
+                     "Unable to create macOS IOHID manager for Caps Lock");
         return false;
     }
 
+    const void* keys[] = { CFSTR(kIOHIDElementUsagePageKey), CFSTR(kIOHIDElementUsageKey) };
+    const int page = kKeyboardUsagePage;
+    const int usage = kCapsLockUsage;
+    CFNumberRef pageNumber = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &page);
+    CFNumberRef usageNumber = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &usage);
+    const void* values[] = { pageNumber, usageNumber };
+    CFDictionaryRef matching = CFDictionaryCreate(kCFAllocatorDefault,
+                                                   keys, values, 2,
+                                                   &kCFTypeDictionaryKeyCallBacks,
+                                                   &kCFTypeDictionaryValueCallBacks);
+
+    IOHIDManagerSetInputValueMatching(s_HidManager, matching);
+    IOHIDManagerRegisterInputValueCallback(s_HidManager, handleHidValue, nullptr);
+    IOHIDManagerScheduleWithRunLoop(s_HidManager,
+                                    CFRunLoopGetMain(),
+                                    kCFRunLoopCommonModes);
+
+    CFRelease(matching);
+    CFRelease(pageNumber);
+    CFRelease(usageNumber);
+
+    const IOReturn result = IOHIDManagerOpen(s_HidManager, kIOHIDOptionsTypeNone);
+    if (result != kIOReturnSuccess) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "Unable to open macOS IOHID manager for Caps Lock: 0x%x",
+                     result);
+        stopCapture();
+        return false;
+    }
+
+    s_CapsLockDown = false;
     return true;
 }
