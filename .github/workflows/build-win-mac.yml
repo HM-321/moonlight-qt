@@ -9,6 +9,10 @@ on:
       ci_version:
         required: true
         type: string
+      target:
+        required: false
+        type: string
+        default: all
 
 jobs:
   build:
@@ -16,14 +20,7 @@ jobs:
       CI_VERSION: ${{ inputs.ci_version }}
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          # Windows
-          - os: windows-2025
-            qt_version: 6.12.1
-          # macOS
-          - os: macos-26
-            qt_version: 6.11.3
+      matrix: ${{ fromJSON(inputs.target == 'macos' && '{"include":[{"os":"macos-26","qt_version":"6.11.3"}]}' || '{"include":[{"os":"windows-2025","qt_version":"6.12.1"},{"os":"macos-26","qt_version":"6.11.3"}]}') }}
 
     runs-on: ${{ matrix.os }}
 
@@ -53,6 +50,26 @@ jobs:
           tools: ${{ runner.os == 'Windows' && 'tools_qtcreator_gui' || '' }}
           version: ${{ matrix.qt_version }}
           aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e'
+
+      - name: Install ccache (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ccache
+
+      - name: Cache ccache (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/ccache
+          key: ccache-${{ runner.os }}-${{ matrix.qt_version }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ matrix.qt_version }}-
+
+      - name: Configure ccache (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p "$HOME/Library/Caches/ccache"
+          echo "CCACHE_DIR=$HOME/Library/Caches/ccache" >> "$GITHUB_ENV"
+          ccache --max-size=2G
 
       - name: Install Qt ARM64 (Windows)
         if: runner.os == 'Windows'

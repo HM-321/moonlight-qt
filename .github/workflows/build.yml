@@ -5,6 +5,15 @@ permissions:
 
 on:
   workflow_dispatch:
+    inputs:
+      build_target:
+        description: Build target for manual runs
+        required: true
+        type: choice
+        options:
+          - macos
+          - all
+        default: macos
   push:
   pull_request:
     branches:
@@ -28,12 +37,14 @@ jobs:
           echo "ci_version=${CI_VERSION}" >> "${GITHUB_OUTPUT}"
 
   build-appimage:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_target == 'all' }}
     needs: setup
     uses: ./.github/workflows/build-appimage.yml
     with:
       ci_version: ${{ needs.setup.outputs.ci_version }}
 
   build-steamlink:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_target == 'all' }}
     needs: setup
     uses: ./.github/workflows/build-steamlink.yml
     with:
@@ -44,3 +55,4 @@ jobs:
     uses: ./.github/workflows/build-win-mac.yml
     with:
       ci_version: ${{ needs.setup.outputs.ci_version }}
+      target: ${{ github.event_name == 'workflow_dispatch' && inputs.build_target || 'all' }}
