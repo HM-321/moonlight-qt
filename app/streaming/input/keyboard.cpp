@@ -281,11 +281,9 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
 
     if (!m_BypassKeyboardMappings && !m_KeyboardMappings.isEmpty()) {
         const SDL_Scancode sourceScancode = event->keysym.scancode;
-        if (sourceScancode == m_MacHidCapsLockTarget) {
-            handleKeyEventDirect(event, true);
-            return;
-        }
-
+        const bool macHidMappedMetaKey =
+            sourceScancode == m_MacHidCapsLockTarget &&
+            (sourceScancode == SDL_SCANCODE_LGUI || sourceScancode == SDL_SCANCODE_RGUI);
         const int sourceModifier = KeyboardMappingStore::modifierForScancode(sourceScancode);
 
         if (sourceModifier != 0) {
@@ -302,7 +300,7 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
                 }
 
                 m_ForwardedModifierKeys.insert(sourceScancode);
-                handleKeyEventDirect(event);
+                handleKeyEventDirect(event, macHidMappedMetaKey);
                 return;
             }
 
@@ -319,7 +317,7 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
             }
 
             if (m_ForwardedModifierKeys.remove(sourceScancode)) {
-                handleKeyEventDirect(event);
+                handleKeyEventDirect(event, macHidMappedMetaKey);
                 return;
             }
         }

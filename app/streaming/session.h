@@ -15,6 +15,7 @@
 #include "macfunctionkeymode.h"
 #include "maccapslockmode.h"
 #include "maccapslockmapping.h"
+#include "macjapaneseinputkeycapture.h"
 #endif
 
 class SupportedVideoFormatList : public QList<int>
@@ -267,6 +268,7 @@ private:
     MacFunctionKeyMode m_MacFunctionKeyMode;
     MacCapsLockMode m_MacCapsLockMode;
     MacCapsLockMapping m_MacCapsLockMapping;
+    MacJapaneseInputKeyCapture m_MacJapaneseInputKeyCapture;
     bool m_MacFunctionKeysOnFocus;
     bool m_DisableMacCapsLock;
 #endif

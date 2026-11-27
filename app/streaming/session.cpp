@@ -1944,6 +1944,11 @@ void Session::exec()
         (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS)) {
         m_MacCapsLockMode.setStreamingActive(true);
     }
+    if ((SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS) &&
+        !m_MacJapaneseInputKeyCapture.setStreamingActive(true)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Mac Eisu/Kana keys may also change the local input source");
+    }
 #endif
 
     QSvgRenderer svgIconRenderer(QString(":/res/moonlight.svg"));
@@ -2120,6 +2125,7 @@ void Session::exec()
                 if (m_DisableMacCapsLock) {
                     m_MacCapsLockMode.setStreamingActive(false);
                 }
+                m_MacJapaneseInputKeyCapture.setStreamingActive(false);
 #endif
                 if (m_Preferences->muteOnFocusLoss) {
                     m_AudioMuted = true;
@@ -2133,6 +2139,10 @@ void Session::exec()
                 }
                 if (m_DisableMacCapsLock) {
                     m_MacCapsLockMode.setStreamingActive(true);
+                }
+                if (!m_MacJapaneseInputKeyCapture.setStreamingActive(true)) {
+                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                                "Mac Eisu/Kana keys may also change the local input source");
                 }
 #endif
                 if (m_Preferences->muteOnFocusLoss) {
@@ -2401,6 +2411,7 @@ void Session::exec()
 DispatchDeferredCleanup:
 #ifdef Q_OS_DARWIN
     m_MacFunctionKeyMode.setStreamingActive(false);
+    m_MacJapaneseInputKeyCapture.setStreamingActive(false);
 #endif
 
     // Switch back to synchronous logging mode

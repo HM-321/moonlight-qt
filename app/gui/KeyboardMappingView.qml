@@ -200,7 +200,7 @@ Item {
                             ToolTip.delay: 1000
                             ToolTip.timeout: 10000
                             ToolTip.visible: hovered
-                            ToolTip.text: qsTr("Sends Eisu as the Windows Alphanumeric mode key and Kana as the Hiragana mode key, not Convert/Nonconvert.")
+                            ToolTip.text: qsTr("While Moonlight is focused, Eisu/Kana will not change the Mac input source. Eisu is sent as the Windows Alphanumeric mode key and Kana as the Hiragana mode key, not Convert/Nonconvert.")
                         }
                     }
                 }

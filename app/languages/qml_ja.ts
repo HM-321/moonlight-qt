@@ -1404,8 +1404,8 @@
         <translation>Macの英数／かなキーで日本語入力を切り替える</translation>
     </message>
     <message>
-        <source>Sends Eisu as the Windows Alphanumeric mode key and Kana as the Hiragana mode key, not Convert/Nonconvert.</source>
-        <translation>英数キーをWindowsの英数モードキーとして、かなキーをひらがなモードキーとして送信します。変換／無変換キーとしては送信しません。</translation>
+        <source>While Moonlight is focused, Eisu/Kana will not change the Mac input source. Eisu is sent as the Windows Alphanumeric mode key and Kana as the Hiragana mode key, not Convert/Nonconvert.</source>
+        <translation>Moonlightにフォーカスがある間、英数／かなキーでMacの入力ソースは切り替わりません。英数キーはWindowsの英数モードキー、かなキーはひらがなモードキーとして送信し、変換／無変換キーとしては送信しません。</translation>
     </message>
 </context>
 </TS>
