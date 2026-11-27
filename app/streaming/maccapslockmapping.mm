@@ -13,6 +13,30 @@ namespace {
 constexpr quint64 kCapsLockHidUsage = 0x700000039ULL;
 constexpr quint64 kCapsLockHidSentinelUsage = 0x700000073ULL;
 
+quint64 hidUsageForModifierScancode(SDL_Scancode scancode)
+{
+    switch (scancode) {
+    case SDL_SCANCODE_LCTRL:
+        return 0x7000000E0ULL;
+    case SDL_SCANCODE_LSHIFT:
+        return 0x7000000E1ULL;
+    case SDL_SCANCODE_LALT:
+        return 0x7000000E2ULL;
+    case SDL_SCANCODE_LGUI:
+        return 0x7000000E3ULL;
+    case SDL_SCANCODE_RCTRL:
+        return 0x7000000E4ULL;
+    case SDL_SCANCODE_RSHIFT:
+        return 0x7000000E5ULL;
+    case SDL_SCANCODE_RALT:
+        return 0x7000000E6ULL;
+    case SDL_SCANCODE_RGUI:
+        return 0x7000000E7ULL;
+    default:
+        return 0;
+    }
+}
+
 bool runHidutil(const QStringList& arguments, QByteArray* standardOutput)
 {
     QProcess process;
@@ -112,7 +136,8 @@ MacCapsLockMapping::~MacCapsLockMapping()
 
 bool MacCapsLockMapping::activate(SDL_Scancode targetKey)
 {
-    if (KeyboardMappingStore::modifierForScancode(targetKey) == 0) {
+    const quint64 targetUsage = hidUsageForModifierScancode(targetKey);
+    if (targetUsage == 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "Cannot map Caps Lock to unsupported HID modifier scancode %d",
                      targetKey);
@@ -163,7 +188,7 @@ bool MacCapsLockMapping::activate(SDL_Scancode targetKey)
     capsLockMapping.insert(QStringLiteral("HIDKeyboardModifierMappingSrc"),
                            static_cast<double>(kCapsLockHidUsage));
     capsLockMapping.insert(QStringLiteral("HIDKeyboardModifierMappingDst"),
-                           static_cast<double>(kCapsLockHidSentinelUsage));
+                           static_cast<double>(targetUsage));
     activeMappings.append(capsLockMapping);
 
     if (!writeHidMappings(serializeHidMappings(activeMappings))) {
@@ -211,7 +236,7 @@ bool MacCapsLockMapping::activate(SDL_Scancode targetKey)
     m_IsActive = true;
     m_TargetKey = targetKey;
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "Temporarily mapped macOS Caps Lock to F24 sentinel for SDL scancode %d",
+                "Temporarily mapped macOS Caps Lock directly to HID modifier scancode %d",
                 targetKey);
     return true;
 }
