@@ -15,6 +15,7 @@
 #include "macfunctionkeymode.h"
 #include "maccapslockmode.h"
 #include "maccapslockmapping.h"
+#include "maccapslockkeycapture.h"
 #include "macjapaneseinputkeycapture.h"
 #endif
 
@@ -268,6 +269,8 @@ private:
     MacFunctionKeyMode m_MacFunctionKeyMode;
     MacCapsLockMode m_MacCapsLockMode;
     MacCapsLockMapping m_MacCapsLockMapping;
+    MacCapsLockKeyCapture m_MacCapsLockKeyCapture;
+    bool m_MacCapsLockKeyCaptureEnabled;
     MacJapaneseInputKeyCapture m_MacJapaneseInputKeyCapture;
     bool m_MacFunctionKeysOnFocus;
     bool m_DisableMacCapsLock;

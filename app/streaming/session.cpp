@@ -614,6 +614,7 @@ Session::Session(NvComputer* computer, NvApp& app, StreamingPreferences *prefere
     const HostKeyboardSettings hostSettings = KeyboardMappingStore::loadHostSettings(computer->uuid);
     m_MacFunctionKeysOnFocus = hostSettings.macFunctionKeysOnFocus;
     m_DisableMacCapsLock = hostSettings.disableMacCapsLock;
+    m_MacCapsLockKeyCaptureEnabled = false;
 #endif
 }
 
@@ -1927,12 +1928,18 @@ void Session::exec()
 #ifdef Q_OS_DARWIN
     const SDL_Scancode capsLockTarget = macCapsLockModifierTarget(m_Computer->uuid);
     if (capsLockTarget != SDL_SCANCODE_UNKNOWN) {
-        if (m_MacCapsLockMapping.activate(capsLockTarget)) {
-            m_InputHandler->setMacHidCapsLockTarget(capsLockTarget);
+        // SDL on macOS may still report Caps Lock after hidutil remaps it to F24.
+        // Capture the physical key state with AppKit and inject an F24 sentinel
+        // ourselves, preserving real key-down/key-up semantics for modifiers.
+        m_InputHandler->setMacHidCapsLockTarget(capsLockTarget);
+        if (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS) {
+            m_MacCapsLockKeyCaptureEnabled =
+                m_MacCapsLockKeyCapture.setStreamingActive(true);
         }
-        else {
+        if (!m_MacCapsLockKeyCaptureEnabled) {
+            m_InputHandler->setMacHidCapsLockTarget(SDL_SCANCODE_UNKNOWN);
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "Caps Lock modifier mapping is unavailable; using SDL key mapping");
+                        "Physical Caps Lock capture is unavailable; using SDL key mapping");
         }
     }
 
@@ -2126,6 +2133,9 @@ void Session::exec()
                     m_MacCapsLockMode.setStreamingActive(false);
                 }
                 m_MacJapaneseInputKeyCapture.setStreamingActive(false);
+                if (m_MacCapsLockKeyCaptureEnabled) {
+                    m_MacCapsLockKeyCapture.setStreamingActive(false);
+                }
 #endif
                 if (m_Preferences->muteOnFocusLoss) {
                     m_AudioMuted = true;
@@ -2143,6 +2153,16 @@ void Session::exec()
                 if (!m_MacJapaneseInputKeyCapture.setStreamingActive(true)) {
                     SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                                 "Mac Eisu/Kana keys may also change the local input source");
+                }
+                const SDL_Scancode focusCapsLockTarget =
+                    macCapsLockModifierTarget(m_Computer->uuid);
+                if (focusCapsLockTarget != SDL_SCANCODE_UNKNOWN) {
+                    m_InputHandler->setMacHidCapsLockTarget(focusCapsLockTarget);
+                    m_MacCapsLockKeyCaptureEnabled =
+                        m_MacCapsLockKeyCapture.setStreamingActive(true);
+                    if (!m_MacCapsLockKeyCaptureEnabled) {
+                        m_InputHandler->setMacHidCapsLockTarget(SDL_SCANCODE_UNKNOWN);
+                    }
                 }
 #endif
                 if (m_Preferences->muteOnFocusLoss) {
@@ -2348,6 +2368,12 @@ void Session::exec()
                     event.key.keysym.scancode == SDL_SCANCODE_CAPSLOCK) {
                 m_MacCapsLockMode.forceOff();
             }
+            if (m_MacCapsLockKeyCaptureEnabled &&
+                    event.key.keysym.scancode == SDL_SCANCODE_CAPSLOCK) {
+                // AppKit capture injects the authoritative F24 down/up pair.
+                // Discard SDL's duplicate/toggle-style Caps Lock event.
+                break;
+            }
 #endif
             m_InputHandler->handleKeyEvent(&event.key);
             break;
@@ -2412,6 +2438,8 @@ DispatchDeferredCleanup:
 #ifdef Q_OS_DARWIN
     m_MacFunctionKeyMode.setStreamingActive(false);
     m_MacJapaneseInputKeyCapture.setStreamingActive(false);
+    m_MacCapsLockKeyCapture.setStreamingActive(false);
+    m_MacCapsLockKeyCaptureEnabled = false;
 #endif
 
     // Switch back to synchronous logging mode
