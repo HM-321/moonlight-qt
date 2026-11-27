@@ -161,8 +161,11 @@ macx {
         CONFIG += discord-rpc libplacebo
     }
 
-    LIBS += -lobjc -framework VideoToolbox -framework AVFoundation -framework CoreVideo -framework CoreGraphics -framework CoreMedia -framework AppKit -framework Metal -framework QuartzCore
+    LIBS += -lobjc -framework VideoToolbox -framework AVFoundation -framework CoreVideo -framework CoreGraphics -framework CoreMedia -framework AppKit -framework Metal -framework QuartzCore -framework IOKit -framework CoreFoundation
     CONFIG += ffmpeg
+
+    SOURCES += streaming/macfunctionkeymode.mm
+    HEADERS += streaming/macfunctionkeymode.h
 }
 
 SOURCES += \

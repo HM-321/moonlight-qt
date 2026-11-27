@@ -11,6 +11,10 @@
 #include "audio/renderers/renderer.h"
 #include "video/overlaymanager.h"
 
+#ifdef Q_OS_DARWIN
+#include "macfunctionkeymode.h"
+#endif
+
 class SupportedVideoFormatList : public QList<int>
 {
 public:
@@ -257,6 +261,9 @@ private:
     bool m_AudioMuted;
     Uint32 m_FullScreenFlag;
     QQuickWindow* m_QtWindow;
+#ifdef Q_OS_DARWIN
+    MacFunctionKeyMode m_MacFunctionKeyMode;
+#endif
     bool m_UnexpectedTermination;
     SdlInputHandler* m_InputHandler;
     int m_MouseEmulationRefCount;
