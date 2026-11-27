@@ -298,11 +298,30 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
 
         if (sourceModifier != 0) {
             if (event->state == SDL_PRESSED) {
+                const int sourceModifiers =
+                    KeyboardMappingStore::modifiersFromSdl(event->keysym.mod) & ~sourceModifier;
+                for (const KeyboardMapping& mapping : std::as_const(m_KeyboardMappings)) {
+                    if (mapping.sourceKey == sourceScancode &&
+                            mapping.sourceModifiers == sourceModifiers) {
+                        m_ActiveKeyboardMappings.insert(sourceScancode, mapping);
+                        handleMappedKeyEvent(event, mapping);
+                        return;
+                    }
+                }
+
                 m_PendingModifierKeyDowns.insert(sourceScancode, *event);
                 return;
             }
 
             if (m_ConsumedModifierKeyUps.remove(sourceScancode)) {
+                return;
+            }
+
+            auto activeMapping = m_ActiveKeyboardMappings.find(sourceScancode);
+            if (activeMapping != m_ActiveKeyboardMappings.end()) {
+                const KeyboardMapping mapping = activeMapping.value();
+                m_ActiveKeyboardMappings.erase(activeMapping);
+                handleMappedKeyEvent(event, mapping);
                 return;
             }
 
@@ -349,6 +368,23 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
                         m_ConsumedModifierKeyUps.insert(scancode);
                     }
                     m_PendingModifierKeyDowns.clear();
+
+                    const QList<SDL_Scancode> activeScancodes = m_ActiveKeyboardMappings.keys();
+                    for (SDL_Scancode scancode : activeScancodes) {
+                        const int modifier = KeyboardMappingStore::modifierForScancode(scancode);
+                        if ((mapping.sourceModifiers & modifier) == 0) {
+                            continue;
+                        }
+
+                        auto activeModifier = m_ActiveKeyboardMappings.find(scancode);
+                        SDL_KeyboardEvent keyUpEvent = *event;
+                        keyUpEvent.state = SDL_RELEASED;
+                        keyUpEvent.keysym.scancode = scancode;
+                        handleMappedKeyEvent(&keyUpEvent, activeModifier.value());
+                        m_ActiveKeyboardMappings.erase(activeModifier);
+                        m_ConsumedModifierKeyUps.insert(scancode);
+                    }
+
                     m_ActiveKeyboardMappings.insert(sourceScancode, mapping);
 
                     handleMappedKeyEvent(event, mapping);
