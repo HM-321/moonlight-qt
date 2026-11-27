@@ -260,6 +260,70 @@ void SdlInputHandler::handleMappedKeyEvent(SDL_KeyboardEvent* event, const Keybo
     }
 }
 
+SDL_Keymod SdlInputHandler::mappedModifiersForEvent(SDL_Keymod sourceModifiers) const
+{
+    int effectiveModifiers = KeyboardMappingStore::modifiersFromSdl(sourceModifiers);
+    int mappedSourceModifiers = 0;
+    int forwardedSourceModifiers = 0;
+    int mappedTargetModifiers = 0;
+
+    for (auto it = m_ActiveKeyboardMappings.cbegin();
+         it != m_ActiveKeyboardMappings.cend(); ++it) {
+        const int sourceModifier = KeyboardMappingStore::modifierForScancode(it.key());
+        if (sourceModifier == 0) {
+            continue;
+        }
+
+        mappedSourceModifiers |= sourceModifier;
+        mappedTargetModifiers |=
+            KeyboardMappingStore::modifierForScancode(it.value().targetKey) |
+            it.value().targetModifiers;
+    }
+
+    for (SDL_Scancode scancode : std::as_const(m_ForwardedModifierKeys)) {
+        forwardedSourceModifiers |= KeyboardMappingStore::modifierForScancode(scancode);
+    }
+
+    if (m_MacHidCapsLockDown) {
+        mappedTargetModifiers |=
+            KeyboardMappingStore::modifierForScancode(m_MacHidCapsLockTarget);
+    }
+
+    const int modifierClasses[] = {
+        KeyboardMappingStore::ModifierCtrl,
+        KeyboardMappingStore::ModifierAlt,
+        KeyboardMappingStore::ModifierShift,
+        KeyboardMappingStore::ModifierMeta
+    };
+    for (int modifier : modifierClasses) {
+        if ((mappedSourceModifiers & modifier) != 0 &&
+                (forwardedSourceModifiers & modifier) == 0) {
+            effectiveModifiers &= ~modifier;
+        }
+    }
+    effectiveModifiers |= mappedTargetModifiers;
+
+    return static_cast<SDL_Keymod>(
+        KeyboardMappingStore::modifiersToSdl(effectiveModifiers) |
+        (sourceModifiers & (KMOD_CAPS | KMOD_NUM)));
+}
+
+bool SdlInputHandler::hasMappedMetaModifierActive() const
+{
+    for (auto it = m_ActiveKeyboardMappings.cbegin();
+         it != m_ActiveKeyboardMappings.cend(); ++it) {
+        if (KeyboardMappingStore::modifierForScancode(it.key()) != 0 &&
+                ((KeyboardMappingStore::modifierForScancode(it.value().targetKey) |
+                  it.value().targetModifiers) & KeyboardMappingStore::ModifierMeta) != 0) {
+            return true;
+        }
+    }
+
+    return m_MacHidCapsLockDown &&
+           KeyboardMappingStore::modifierForScancode(m_MacHidCapsLockTarget) ==
+               KeyboardMappingStore::ModifierMeta;
+}
+
 void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
 {
     short keyCode;
@@ -288,6 +352,7 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
             m_MacHidCapsLockTarget,
             0
         };
+        m_MacHidCapsLockDown = event->state == SDL_PRESSED;
         handleMappedKeyEvent(event, mapping);
         return;
     }
@@ -392,6 +457,10 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
         }
     }
 
+    SDL_KeyboardEvent normalizedEvent = *event;
+    normalizedEvent.keysym.mod = mappedModifiersForEvent(event->keysym.mod);
+    event = &normalizedEvent;
+
     // Set modifier flags
     modifiers = 0;
     if (event->keysym.mod & KMOD_CTRL) {
@@ -404,7 +473,9 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
         modifiers |= MODIFIER_SHIFT;
     }
     if (event->keysym.mod & KMOD_GUI) {
-        if (isSystemKeyCaptureActive() || m_ProcessingMappedKey) {
+        if (isSystemKeyCaptureActive() ||
+                m_ProcessingMappedKey ||
+                hasMappedMetaModifierActive()) {
             modifiers |= MODIFIER_META;
         }
     }
@@ -704,6 +775,7 @@ void SdlInputHandler::raiseAllKeys()
         m_ConsumedModifierKeyUps.clear();
         m_ForwardedModifierKeys.clear();
         m_ActiveKeyboardMappings.clear();
+        m_MacHidCapsLockDown = false;
         return;
     }
 
@@ -722,4 +794,5 @@ void SdlInputHandler::raiseAllKeys()
     m_ConsumedModifierKeyUps.clear();
     m_ForwardedModifierKeys.clear();
     m_ActiveKeyboardMappings.clear();
+    m_MacHidCapsLockDown = false;
 }

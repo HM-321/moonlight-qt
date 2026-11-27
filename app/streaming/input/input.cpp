@@ -278,6 +278,7 @@ void SdlInputHandler::setWindow(SDL_Window *window)
 void SdlInputHandler::setMacHidCapsLockTarget(SDL_Scancode scancode)
 {
     m_MacHidCapsLockTarget = scancode;
+    m_MacHidCapsLockDown = false;
 }
 
 void SdlInputHandler::notifyFocusLost()

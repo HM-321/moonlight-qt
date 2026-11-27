@@ -200,6 +200,10 @@ private:
 
     void handleMappedKeyEvent(SDL_KeyboardEvent* event, const KeyboardMapping& mapping);
 
+    SDL_Keymod mappedModifiersForEvent(SDL_Keymod sourceModifiers) const;
+
+    bool hasMappedMetaModifierActive() const;
+
     static
     Uint32 longPressTimerCallback(Uint32 interval, void* param);
 
@@ -236,6 +240,7 @@ private:
     QSet<SDL_Scancode> m_ForwardedModifierKeys;
     QHash<SDL_Scancode, KeyboardMapping> m_ActiveKeyboardMappings;
     SDL_Scancode m_MacHidCapsLockTarget = SDL_SCANCODE_UNKNOWN;
+    bool m_MacHidCapsLockDown = false;
     bool m_MacJapaneseInputKeys;
     bool m_BypassKeyboardMappings;
     bool m_ProcessingMappedKey;
