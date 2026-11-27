@@ -1895,6 +1895,13 @@ void Session::exec()
 
     m_InputHandler->setWindow(m_Window);
 
+#ifdef Q_OS_DARWIN
+    if (m_Preferences->macFunctionKeysOnFocus &&
+        (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS)) {
+        m_MacFunctionKeyMode.setStreamingActive(true);
+    }
+#endif
+
     QSvgRenderer svgIconRenderer(QString(":/res/moonlight.svg"));
     QImage svgImage(ICON_SIZE, ICON_SIZE, QImage::Format_RGBA8888);
     svgImage.fill(0);
@@ -2062,12 +2069,22 @@ void Session::exec()
             // Early handling of some events
             switch (event.window.event) {
             case SDL_WINDOWEVENT_FOCUS_LOST:
+#ifdef Q_OS_DARWIN
+                if (m_Preferences->macFunctionKeysOnFocus) {
+                    m_MacFunctionKeyMode.setStreamingActive(false);
+                }
+#endif
                 if (m_Preferences->muteOnFocusLoss) {
                     m_AudioMuted = true;
                 }
                 m_InputHandler->notifyFocusLost();
                 break;
             case SDL_WINDOWEVENT_FOCUS_GAINED:
+#ifdef Q_OS_DARWIN
+                if (m_Preferences->macFunctionKeysOnFocus) {
+                    m_MacFunctionKeyMode.setStreamingActive(true);
+                }
+#endif
                 if (m_Preferences->muteOnFocusLoss) {
                     m_AudioMuted = false;
                 }
@@ -2325,6 +2342,10 @@ void Session::exec()
     }
 
 DispatchDeferredCleanup:
+#ifdef Q_OS_DARWIN
+    m_MacFunctionKeyMode.setStreamingActive(false);
+#endif
+
     // Switch back to synchronous logging mode
     StreamUtils::exitAsyncLoggingMode();
 

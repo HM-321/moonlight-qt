@@ -1347,6 +1347,23 @@ Flickable {
                                   qsTr("NOTE: Due to a bug in GeForce Experience, this option may not work properly if your host PC has multiple monitors.")
                 }
 
+                CheckBox {
+                    visible: SystemProperties.isDarwin
+                    hoverEnabled: true
+                    width: parent.width
+                    text: qsTr("Use standard function keys while streaming")
+                    font.pointSize: 12
+                    checked: StreamingPreferences.macFunctionKeysOnFocus
+                    onCheckedChanged: {
+                        StreamingPreferences.macFunctionKeysOnFocus = checked
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 10000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Temporarily switches macOS to standard F1-F12 keys while the streaming window is focused. The previous mode is restored when focus leaves or the stream ends. Press Fn with a key to use its Mac function.")
+                }
+
                 Row {
                     spacing: 5
                     width: parent.width

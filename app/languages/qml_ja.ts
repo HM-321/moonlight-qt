@@ -1049,6 +1049,16 @@
         <translation>ゲームではなくリモートデスクトップにマウスを最適化</translation>
     </message>
     <message>
+        <location filename="../gui/SettingsView.qml" line="1354"/>
+        <source>Use standard function keys while streaming</source>
+        <translation>ストリーミング中に標準ファンクションキーを使用</translation>
+    </message>
+    <message>
+        <location filename="../gui/SettingsView.qml" line="1364"/>
+        <source>Temporarily switches macOS to standard F1-F12 keys while the streaming window is focused. The previous mode is restored when focus leaves or the stream ends. Press Fn with a key to use its Mac function.</source>
+        <translation>配信ウィンドウにフォーカスがある間、キーボード上段のキーを一時的にF1〜F12として送信します。フォーカスが外れるか配信が終了すると、元のmacOSファンクションキー設定に戻ります。Macの機能を使うにはFnキーと同時に押してください。</translation>
+    </message>
+    <message>
         <location filename="../gui/SettingsView.qml" line="512"/>
         <location filename="../gui/SettingsView.qml" line="622"/>
         <source>Custom (%1 FPS)</source>
