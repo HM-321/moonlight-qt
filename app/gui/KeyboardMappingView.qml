@@ -1,6 +1,7 @@
 import QtQuick 2.9
 import QtQuick.Controls 2.2
 import QtQuick.Layouts 1.3
+import SystemProperties 1.0
 
 Item {
     id: root
@@ -12,10 +13,25 @@ Item {
     property string computerName
     property var keyOptions: []
     property var mappings: []
+    property var modifierMappings: []
     property string statusText: ""
     property bool saveSucceeded: false
+    property bool macFunctionKeysOnFocus: false
+    property bool disableMacCapsLock: false
     property var sourceModifierOptions: makeModifierOptions(true)
     property var targetModifierOptions: makeModifierOptions(false)
+    property var sourceModifierKeyOptions: makeModifierKeyOptions(true)
+    property var targetModifierKeyOptions: makeModifierKeyOptions(false)
+
+    function makeModifierKeyOptions(source)
+    {
+        return [
+            { "name": qsTr("Control"), "mask": 1 },
+            { "name": source ? qsTr("Option") : qsTr("Alt"), "mask": 2 },
+            { "name": qsTr("Shift"), "mask": 4 },
+            { "name": source ? qsTr("Command") : qsTr("Windows key"), "mask": 8 }
+        ]
+    }
 
     function makeModifierOptions(source)
     {
@@ -60,6 +76,19 @@ Item {
         return 0
     }
 
+    function updateModifierMapping(row, field, value)
+    {
+        var updated = modifierMappings.slice()
+        var mapping = {}
+        for (var key in updated[row]) {
+            mapping[key] = updated[row][key]
+        }
+        mapping[field] = value
+        updated[row] = mapping
+        modifierMappings = updated
+        statusText = ""
+    }
+
     function updateMapping(row, field, value)
     {
         var updated = mappings.slice()
@@ -96,10 +125,46 @@ Item {
         statusText = ""
     }
 
+    function addModifierMapping()
+    {
+        for (var i = 0; i < sourceModifierKeyOptions.length; i++) {
+            var sourceModifier = sourceModifierKeyOptions[i].mask
+            var alreadyMapped = false
+            for (var j = 0; j < modifierMappings.length; j++) {
+                if (modifierMappings[j].sourceModifier === sourceModifier) {
+                    alreadyMapped = true
+                    break
+                }
+            }
+            if (!alreadyMapped) {
+                modifierMappings = modifierMappings.concat([{
+                    "sourceModifier": sourceModifier,
+                    "targetModifier": sourceModifier
+                }])
+                statusText = ""
+                return
+            }
+        }
+        statusText = qsTr("All modifier keys already have mappings.")
+        saveSucceeded = false
+    }
+
+    function removeModifierMapping(row)
+    {
+        var updated = modifierMappings.slice()
+        updated.splice(row, 1)
+        modifierMappings = updated
+        statusText = ""
+    }
+
     function saveMappings()
     {
-        if (!computerModel.saveKeyboardMappings(computerUuid, mappings)) {
-            statusText = qsTr("Could not save mappings. Each input shortcut must be unique.")
+        var hostSettings = {
+            "macFunctionKeysOnFocus": macFunctionKeysOnFocus,
+            "disableMacCapsLock": disableMacCapsLock
+        }
+        if (!computerModel.saveKeyboardConfiguration(computerUuid, mappings, modifierMappings, hostSettings)) {
+            statusText = qsTr("Could not save mappings. Input keys and modifier keys must be unique.")
             saveSucceeded = false
             return
         }
@@ -111,6 +176,10 @@ Item {
     Component.onCompleted: {
         keyOptions = computerModel.keyboardMappingKeys()
         mappings = computerModel.getKeyboardMappings(computerUuid)
+        modifierMappings = computerModel.getModifierMappings(computerUuid)
+        var hostSettings = computerModel.getHostKeyboardSettings(computerUuid)
+        macFunctionKeysOnFocus = hostSettings.macFunctionKeysOnFocus
+        disableMacCapsLock = hostSettings.disableMacCapsLock
     }
 
     ColumnLayout {
@@ -141,6 +210,97 @@ Item {
             ColumnLayout {
                 width: root.width - 48
                 spacing: 8
+
+                GroupBox {
+                    visible: SystemProperties.isDarwin
+                    Layout.fillWidth: true
+                    title: qsTr("Host keyboard settings")
+
+                    ColumnLayout {
+                        anchors.fill: parent
+
+                        CheckBox {
+                            visible: SystemProperties.isDarwin
+                            hoverEnabled: true
+                            text: qsTr("Use standard function keys while streaming")
+                            checked: root.macFunctionKeysOnFocus
+                            onCheckedChanged: root.macFunctionKeysOnFocus = checked
+
+                            ToolTip.delay: 1000
+                            ToolTip.timeout: 10000
+                            ToolTip.visible: hovered
+                            ToolTip.text: qsTr("Temporarily switches macOS to standard F1-F12 keys while the streaming window is focused. The previous mode is restored when focus leaves or the stream ends. Press Fn with a key to use its Mac function.")
+                        }
+
+                        CheckBox {
+                            visible: SystemProperties.isDarwin
+                            hoverEnabled: true
+                            text: qsTr("Keep macOS Caps Lock off while streaming")
+                            checked: root.disableMacCapsLock
+                            onCheckedChanged: root.disableMacCapsLock = checked
+
+                            ToolTip.delay: 1000
+                            ToolTip.timeout: 10000
+                            ToolTip.visible: hovered
+                            ToolTip.text: qsTr("Prevents Caps Lock from lighting on the Mac while this stream is focused. The key is still sent to the Windows host, and the previous Mac state is restored when focus leaves or the stream ends.")
+                        }
+                    }
+                }
+
+                GroupBox {
+                    Layout.fillWidth: true
+                    title: qsTr("Standalone modifier mappings")
+
+                    ColumnLayout {
+                        anchors.fill: parent
+
+                        Label {
+                            Layout.fillWidth: true
+                            wrapMode: Text.Wrap
+                            text: qsTr("Map modifier keys by themselves. These mappings also apply when the modifier is held with another key.")
+                        }
+
+                        Repeater {
+                            model: root.modifierMappings
+
+                            delegate: RowLayout {
+                                property int rowIndex: index
+                                property var mappingData: modelData
+                                Layout.fillWidth: true
+
+                                ComboBox {
+                                    Layout.fillWidth: true
+                                    model: root.sourceModifierKeyOptions
+                                    textRole: "name"
+                                    Component.onCompleted: currentIndex = root.modifierIndex(root.sourceModifierKeyOptions, mappingData.sourceModifier)
+                                    onActivated: root.updateModifierMapping(rowIndex, "sourceModifier", root.sourceModifierKeyOptions[currentIndex].mask)
+                                }
+
+                                Label {
+                                    text: qsTr("to")
+                                }
+
+                                ComboBox {
+                                    Layout.fillWidth: true
+                                    model: root.targetModifierKeyOptions
+                                    textRole: "name"
+                                    Component.onCompleted: currentIndex = root.modifierIndex(root.targetModifierKeyOptions, mappingData.targetModifier)
+                                    onActivated: root.updateModifierMapping(rowIndex, "targetModifier", root.targetModifierKeyOptions[currentIndex].mask)
+                                }
+
+                                Button {
+                                    text: qsTr("Remove")
+                                    onClicked: root.removeModifierMapping(rowIndex)
+                                }
+                            }
+                        }
+
+                        Button {
+                            text: qsTr("Add Modifier Mapping")
+                            onClicked: root.addModifierMapping()
+                        }
+                    }
+                }
 
                 Repeater {
                     model: root.mappings

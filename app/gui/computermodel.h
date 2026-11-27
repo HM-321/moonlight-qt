@@ -2,6 +2,7 @@
 #include "streaming/session.h"
 
 #include <QAbstractListModel>
+#include <QVariantMap>
 
 class ComputerModel : public QAbstractListModel
 {
@@ -48,7 +49,14 @@ public:
 
     Q_INVOKABLE QVariantList getKeyboardMappings(const QString& hostUuid) const;
 
-    Q_INVOKABLE bool saveKeyboardMappings(const QString& hostUuid, const QVariantList& mappings) const;
+    Q_INVOKABLE QVariantList getModifierMappings(const QString& hostUuid) const;
+
+    Q_INVOKABLE QVariantMap getHostKeyboardSettings(const QString& hostUuid) const;
+
+    Q_INVOKABLE bool saveKeyboardConfiguration(const QString& hostUuid,
+                                               const QVariantList& mappings,
+                                               const QVariantList& modifierMappings,
+                                               const QVariantMap& hostSettings) const;
 
     Q_INVOKABLE Session* createSessionForCurrentGame(int computerIndex);
 

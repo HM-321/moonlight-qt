@@ -138,7 +138,31 @@ QVariantList ComputerModel::getKeyboardMappings(const QString& hostUuid) const
     return result;
 }
 
-bool ComputerModel::saveKeyboardMappings(const QString& hostUuid, const QVariantList& mappings) const
+QVariantList ComputerModel::getModifierMappings(const QString& hostUuid) const
+{
+    QVariantList result;
+    for (const ModifierMapping& mapping : KeyboardMappingStore::loadModifierMappings(hostUuid)) {
+        QVariantMap item;
+        item.insert(QStringLiteral("sourceModifier"), mapping.sourceModifier);
+        item.insert(QStringLiteral("targetModifier"), mapping.targetModifier);
+        result.append(item);
+    }
+    return result;
+}
+
+QVariantMap ComputerModel::getHostKeyboardSettings(const QString& hostUuid) const
+{
+    const HostKeyboardSettings settings = KeyboardMappingStore::loadHostSettings(hostUuid);
+    return {
+        {QStringLiteral("macFunctionKeysOnFocus"), settings.macFunctionKeysOnFocus},
+        {QStringLiteral("disableMacCapsLock"), settings.disableMacCapsLock}
+    };
+}
+
+bool ComputerModel::saveKeyboardConfiguration(const QString& hostUuid,
+                                              const QVariantList& mappings,
+                                              const QVariantList& modifierMappings,
+                                              const QVariantMap& hostSettings) const
 {
     QList<KeyboardMapping> parsedMappings;
     for (const QVariant& item : mappings) {
@@ -151,7 +175,27 @@ bool ComputerModel::saveKeyboardMappings(const QString& hostUuid, const QVariant
         };
         parsedMappings.append(mapping);
     }
-    return KeyboardMappingStore::save(hostUuid, parsedMappings);
+
+    QList<ModifierMapping> parsedModifierMappings;
+    for (const QVariant& item : modifierMappings) {
+        const QVariantMap map = item.toMap();
+        ModifierMapping mapping = {
+            map.value(QStringLiteral("sourceModifier")).toInt(),
+            map.value(QStringLiteral("targetModifier")).toInt()
+        };
+        parsedModifierMappings.append(mapping);
+    }
+
+    HostKeyboardSettings parsedHostSettings;
+    parsedHostSettings.macFunctionKeysOnFocus =
+        hostSettings.value(QStringLiteral("macFunctionKeysOnFocus")).toBool();
+    parsedHostSettings.disableMacCapsLock =
+        hostSettings.value(QStringLiteral("disableMacCapsLock")).toBool();
+
+    return KeyboardMappingStore::saveConfiguration(hostUuid,
+                                                   parsedMappings,
+                                                   parsedModifierMappings,
+                                                   parsedHostSettings);
 }
 
 Session* ComputerModel::createSessionForCurrentGame(int computerIndex)

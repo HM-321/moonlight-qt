@@ -586,6 +586,11 @@ Session::Session(NvComputer* computer, NvApp& app, StreamingPreferences *prefere
       m_AudioSampleCount(0),
       m_DropAudioEndTime(0)
 {
+#ifdef Q_OS_DARWIN
+    const HostKeyboardSettings hostSettings = KeyboardMappingStore::loadHostSettings(computer->uuid);
+    m_MacFunctionKeysOnFocus = hostSettings.macFunctionKeysOnFocus;
+    m_DisableMacCapsLock = hostSettings.disableMacCapsLock;
+#endif
 }
 
 Session::~Session()
@@ -1896,9 +1901,13 @@ void Session::exec()
     m_InputHandler->setWindow(m_Window);
 
 #ifdef Q_OS_DARWIN
-    if (m_Preferences->macFunctionKeysOnFocus &&
+    if (m_MacFunctionKeysOnFocus &&
         (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS)) {
         m_MacFunctionKeyMode.setStreamingActive(true);
+    }
+    if (m_DisableMacCapsLock &&
+        (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS)) {
+        m_MacCapsLockMode.setStreamingActive(true);
     }
 #endif
 
@@ -2070,8 +2079,11 @@ void Session::exec()
             switch (event.window.event) {
             case SDL_WINDOWEVENT_FOCUS_LOST:
 #ifdef Q_OS_DARWIN
-                if (m_Preferences->macFunctionKeysOnFocus) {
+                if (m_MacFunctionKeysOnFocus) {
                     m_MacFunctionKeyMode.setStreamingActive(false);
+                }
+                if (m_DisableMacCapsLock) {
+                    m_MacCapsLockMode.setStreamingActive(false);
                 }
 #endif
                 if (m_Preferences->muteOnFocusLoss) {
@@ -2081,8 +2093,11 @@ void Session::exec()
                 break;
             case SDL_WINDOWEVENT_FOCUS_GAINED:
 #ifdef Q_OS_DARWIN
-                if (m_Preferences->macFunctionKeysOnFocus) {
+                if (m_MacFunctionKeysOnFocus) {
                     m_MacFunctionKeyMode.setStreamingActive(true);
+                }
+                if (m_DisableMacCapsLock) {
+                    m_MacCapsLockMode.setStreamingActive(true);
                 }
 #endif
                 if (m_Preferences->muteOnFocusLoss) {
@@ -2282,6 +2297,13 @@ void Session::exec()
         case SDL_KEYUP:
         case SDL_KEYDOWN:
             presence.runCallbacks();
+#ifdef Q_OS_DARWIN
+            if (m_DisableMacCapsLock &&
+                    event.type == SDL_KEYDOWN &&
+                    event.key.keysym.scancode == SDL_SCANCODE_CAPSLOCK) {
+                m_MacCapsLockMode.forceOff();
+            }
+#endif
             m_InputHandler->handleKeyEvent(&event.key);
             break;
         case SDL_MOUSEBUTTONDOWN:
@@ -2344,6 +2366,7 @@ void Session::exec()
 DispatchDeferredCleanup:
 #ifdef Q_OS_DARWIN
     m_MacFunctionKeyMode.setStreamingActive(false);
+    m_MacCapsLockMode.setStreamingActive(false);
 #endif
 
     // Switch back to synchronous logging mode

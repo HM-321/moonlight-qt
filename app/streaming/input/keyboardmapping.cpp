@@ -99,10 +99,83 @@ QList<KeyboardMapping> KeyboardMappingStore::load(const QString& hostUuid)
     return mappings;
 }
 
-bool KeyboardMappingStore::save(const QString& hostUuid, const QList<KeyboardMapping>& mappings)
+QList<ModifierMapping> KeyboardMappingStore::loadModifierMappings(const QString& hostUuid)
+{
+    QList<ModifierMapping> mappings;
+    if (hostUuid.isEmpty()) {
+        return mappings;
+    }
+
+    QSettings settings;
+    settings.beginGroup(QStringLiteral("keyboardmappings"));
+    settings.beginGroup(hostUuid);
+    const int count = settings.beginReadArray(QStringLiteral("modifierMappings"));
+    QSet<int> sourceModifiers;
+
+    for (int i = 0; i < count; i++) {
+        settings.setArrayIndex(i);
+
+        ModifierMapping mapping = {
+            settings.value(QStringLiteral("sourceModifier")).toInt(),
+            settings.value(QStringLiteral("targetModifier")).toInt()
+        };
+        if ((mapping.sourceModifier != ModifierCtrl &&
+             mapping.sourceModifier != ModifierAlt &&
+             mapping.sourceModifier != ModifierShift &&
+             mapping.sourceModifier != ModifierMeta) ||
+                (mapping.targetModifier != ModifierCtrl &&
+                 mapping.targetModifier != ModifierAlt &&
+                 mapping.targetModifier != ModifierShift &&
+                 mapping.targetModifier != ModifierMeta) ||
+                sourceModifiers.contains(mapping.sourceModifier)) {
+            qWarning() << "Ignoring invalid or duplicate saved modifier mapping for host" << hostUuid;
+            continue;
+        }
+
+        sourceModifiers.insert(mapping.sourceModifier);
+        mappings.append(mapping);
+    }
+
+    settings.endArray();
+    settings.endGroup();
+    settings.endGroup();
+    return mappings;
+}
+
+HostKeyboardSettings KeyboardMappingStore::loadHostSettings(const QString& hostUuid)
+{
+    HostKeyboardSettings hostSettings;
+    if (hostUuid.isEmpty()) {
+        return hostSettings;
+    }
+
+    QSettings settings;
+    const bool legacyFunctionKeySetting = settings.value(QStringLiteral("macfunctionkeysonfocus"), false).toBool();
+    settings.beginGroup(QStringLiteral("keyboardmappings"));
+    settings.beginGroup(hostUuid);
+    const bool hasHostFunctionKeySetting = settings.contains(QStringLiteral("macFunctionKeysOnFocus"));
+    hostSettings.macFunctionKeysOnFocus =
+        settings.value(QStringLiteral("macFunctionKeysOnFocus"), legacyFunctionKeySetting).toBool();
+    hostSettings.disableMacCapsLock =
+        settings.value(QStringLiteral("disableMacCapsLock"), false).toBool();
+    if (!hasHostFunctionKeySetting) {
+        settings.setValue(QStringLiteral("macFunctionKeysOnFocus"), hostSettings.macFunctionKeysOnFocus);
+        if (settings.status() != QSettings::NoError) {
+            qWarning() << "Failed to migrate macOS F-key preference for host" << hostUuid;
+        }
+    }
+    settings.endGroup();
+    settings.endGroup();
+    return hostSettings;
+}
+
+bool KeyboardMappingStore::saveConfiguration(const QString& hostUuid,
+                                             const QList<KeyboardMapping>& mappings,
+                                             const QList<ModifierMapping>& modifierMappings,
+                                             const HostKeyboardSettings& hostSettings)
 {
     if (hostUuid.isEmpty()) {
-        qWarning() << "Cannot save keyboard mappings without a host UUID";
+        qWarning() << "Cannot save keyboard configuration without a host UUID";
         return false;
     }
 
@@ -121,6 +194,23 @@ bool KeyboardMappingStore::save(const QString& hostUuid, const QList<KeyboardMap
         sourceChords.insert(sourceChord);
     }
 
+    QSet<int> sourceModifiers;
+    for (const ModifierMapping& mapping : modifierMappings) {
+        if ((mapping.sourceModifier != ModifierCtrl &&
+             mapping.sourceModifier != ModifierAlt &&
+             mapping.sourceModifier != ModifierShift &&
+             mapping.sourceModifier != ModifierMeta) ||
+                (mapping.targetModifier != ModifierCtrl &&
+                 mapping.targetModifier != ModifierAlt &&
+                 mapping.targetModifier != ModifierShift &&
+                 mapping.targetModifier != ModifierMeta) ||
+                sourceModifiers.contains(mapping.sourceModifier)) {
+            qWarning() << "Refusing to save invalid or duplicate modifier mappings for host" << hostUuid;
+            return false;
+        }
+        sourceModifiers.insert(mapping.sourceModifier);
+    }
+
     QSettings settings;
     settings.beginGroup(QStringLiteral("keyboardmappings"));
     settings.beginGroup(hostUuid);
@@ -135,11 +225,21 @@ bool KeyboardMappingStore::save(const QString& hostUuid, const QList<KeyboardMap
         settings.setValue(QStringLiteral("targetModifiers"), mapping.targetModifiers);
     }
     settings.endArray();
+    settings.beginWriteArray(QStringLiteral("modifierMappings"), modifierMappings.size());
+    for (int i = 0; i < modifierMappings.size(); i++) {
+        const ModifierMapping& mapping = modifierMappings[i];
+        settings.setArrayIndex(i);
+        settings.setValue(QStringLiteral("sourceModifier"), mapping.sourceModifier);
+        settings.setValue(QStringLiteral("targetModifier"), mapping.targetModifier);
+    }
+    settings.endArray();
+    settings.setValue(QStringLiteral("macFunctionKeysOnFocus"), hostSettings.macFunctionKeysOnFocus);
+    settings.setValue(QStringLiteral("disableMacCapsLock"), hostSettings.disableMacCapsLock);
     settings.endGroup();
     settings.endGroup();
 
     if (settings.status() != QSettings::NoError) {
-        qWarning() << "Failed to save keyboard mappings for host" << hostUuid;
+        qWarning() << "Failed to save keyboard configuration for host" << hostUuid;
         return false;
     }
     return true;

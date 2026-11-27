@@ -165,7 +165,8 @@ macx {
     CONFIG += ffmpeg
 
     SOURCES += streaming/macfunctionkeymode.mm
-    HEADERS += streaming/macfunctionkeymode.h
+    SOURCES += streaming/maccapslockmode.mm
+    HEADERS += streaming/macfunctionkeymode.h streaming/maccapslockmode.h
 }
 
 SOURCES += \

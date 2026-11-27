@@ -1053,16 +1053,6 @@
         <translation>ゲームではなくリモートデスクトップにマウスを最適化</translation>
     </message>
     <message>
-        <location filename="../gui/SettingsView.qml" line="1354"/>
-        <source>Use standard function keys while streaming</source>
-        <translation>ストリーミング中に標準ファンクションキーを使用</translation>
-    </message>
-    <message>
-        <location filename="../gui/SettingsView.qml" line="1364"/>
-        <source>Temporarily switches macOS to standard F1-F12 keys while the streaming window is focused. The previous mode is restored when focus leaves or the stream ends. Press Fn with a key to use its Mac function.</source>
-        <translation>配信ウィンドウにフォーカスがある間、キーボード上段のキーを一時的にF1〜F12として送信します。フォーカスが外れるか配信が終了すると、元のmacOSファンクションキー設定に戻ります。Macの機能を使うにはFnキーと同時に押してください。</translation>
-    </message>
-    <message>
         <location filename="../gui/SettingsView.qml" line="512"/>
         <location filename="../gui/SettingsView.qml" line="622"/>
         <source>Custom (%1 FPS)</source>
@@ -1378,8 +1368,8 @@
         <translation>割り当てを追加</translation>
     </message>
     <message>
-        <source>Could not save mappings. Each input shortcut must be unique.</source>
-        <translation>保存できませんでした。入力キーの組み合わせは重複できません。</translation>
+        <source>Could not save mappings. Input keys and modifier keys must be unique.</source>
+        <translation>保存できませんでした。入力キーと修飾キーの割り当ては重複できません。</translation>
     </message>
     <message>
         <source>Keyboard mappings saved.</source>
@@ -1388,6 +1378,70 @@
     <message>
         <source>Save</source>
         <translation>保存</translation>
+    </message>
+    <message>
+        <source>Control</source>
+        <translation>Control</translation>
+    </message>
+    <message>
+        <source>Option</source>
+        <translation>Option</translation>
+    </message>
+    <message>
+        <source>Alt</source>
+        <translation>Alt</translation>
+    </message>
+    <message>
+        <source>Shift</source>
+        <translation>Shift</translation>
+    </message>
+    <message>
+        <source>Command</source>
+        <translation>Command</translation>
+    </message>
+    <message>
+        <source>Windows key</source>
+        <translation>Windowsキー</translation>
+    </message>
+    <message>
+        <source>Host keyboard settings</source>
+        <translation>ホストキーボード設定</translation>
+    </message>
+    <message>
+        <source>Use standard function keys while streaming</source>
+        <translation>ストリーミング中に標準ファンクションキーを使用</translation>
+    </message>
+    <message>
+        <source>Temporarily switches macOS to standard F1-F12 keys while the streaming window is focused. The previous mode is restored when focus leaves or the stream ends. Press Fn with a key to use its Mac function.</source>
+        <translation>ストリーミングウィンドウにフォーカスがある間、macOSを一時的に標準のF1〜F12キーに切り替えます。フォーカスが外れるかストリーミングが終了すると元の設定に戻ります。Macの機能を使うにはFnキーと同時に押してください。</translation>
+    </message>
+    <message>
+        <source>Keep macOS Caps Lock off while streaming</source>
+        <translation>ストリーミング中にmacOSのCaps Lockを無効にする</translation>
+    </message>
+    <message>
+        <source>Prevents Caps Lock from lighting on the Mac while this stream is focused. The key is still sent to the Windows host, and the previous Mac state is restored when focus leaves or the stream ends.</source>
+        <translation>ストリーミングにフォーカスがある間、MacのCaps Lockランプを消灯したままにします。キー入力はWindowsホストにも送信され、フォーカスが外れるかストリーミングが終了するとMac側の元の状態に戻ります。</translation>
+    </message>
+    <message>
+        <source>Standalone modifier mappings</source>
+        <translation>修飾キー単体の割り当て</translation>
+    </message>
+    <message>
+        <source>Map modifier keys by themselves. These mappings also apply when the modifier is held with another key.</source>
+        <translation>修飾キー単体の割り当てを設定します。ほかのキーと同時に押した場合にも適用されます。</translation>
+    </message>
+    <message>
+        <source>to</source>
+        <translation>→</translation>
+    </message>
+    <message>
+        <source>Add Modifier Mapping</source>
+        <translation>修飾キー割り当てを追加</translation>
+    </message>
+    <message>
+        <source>All modifier keys already have mappings.</source>
+        <translation>すべての修飾キーに割り当てがあります。</translation>
     </message>
 </context>
 </TS>

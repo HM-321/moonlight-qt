@@ -14,6 +14,18 @@ struct KeyboardMapping
     int targetModifiers;
 };
 
+struct ModifierMapping
+{
+    int sourceModifier;
+    int targetModifier;
+};
+
+struct HostKeyboardSettings
+{
+    bool macFunctionKeysOnFocus = false;
+    bool disableMacCapsLock = false;
+};
+
 class KeyboardMappingStore
 {
 public:
@@ -27,7 +39,12 @@ public:
     };
 
     static QList<KeyboardMapping> load(const QString& hostUuid);
-    static bool save(const QString& hostUuid, const QList<KeyboardMapping>& mappings);
+    static QList<ModifierMapping> loadModifierMappings(const QString& hostUuid);
+    static HostKeyboardSettings loadHostSettings(const QString& hostUuid);
+    static bool saveConfiguration(const QString& hostUuid,
+                                  const QList<KeyboardMapping>& mappings,
+                                  const QList<ModifierMapping>& modifierMappings,
+                                  const HostKeyboardSettings& hostSettings);
     static void remove(const QString& hostUuid);
     static QVariantList supportedKeys();
     static bool isSupportedKey(SDL_Scancode scancode);
