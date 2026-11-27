@@ -141,7 +141,7 @@ Item {
         }
 
         Label {
-            text: qsTr("Map a Mac key or combination to a Windows key or combination. Source and target key choices are listed separately. Caps Lock mapped directly to a modifier uses a temporary macOS HID mapping so it stays held until release; the previous mapping is restored when streaming ends. Unmapped keys pass through unchanged.")
+            text: qsTr("Map a Mac key or combination to a Windows key or combination. Source and target key choices are listed separately. Caps Lock mapped directly to a modifier uses a temporary macOS HID mapping so it stays held until release and remains distinct from Option; F24 is reserved for this while streaming. The previous mapping is restored when streaming ends. Unmapped keys pass through unchanged.")
             font.pointSize: 12
             Layout.fillWidth: true
             wrapMode: Text.Wrap

@@ -6,6 +6,8 @@
 #include <QString>
 #include <QVariantList>
 
+constexpr SDL_Scancode kMacCapsLockHidSentinelScancode = SDL_SCANCODE_F24;
+
 struct KeyboardMapping
 {
     SDL_Scancode sourceKey;

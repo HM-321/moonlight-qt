@@ -279,6 +279,19 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
         return;
     }
 
+    if (!m_BypassKeyboardMappings &&
+            m_MacHidCapsLockTarget != SDL_SCANCODE_UNKNOWN &&
+            event->keysym.scancode == kMacCapsLockHidSentinelScancode) {
+        const KeyboardMapping mapping = {
+            SDL_SCANCODE_CAPSLOCK,
+            0,
+            m_MacHidCapsLockTarget,
+            0
+        };
+        handleMappedKeyEvent(event, mapping);
+        return;
+    }
+
     if (!m_BypassKeyboardMappings && !m_KeyboardMappings.isEmpty()) {
         const SDL_Scancode sourceScancode = event->keysym.scancode;
         const bool macHidMappedMetaKey =

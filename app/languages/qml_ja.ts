@@ -1344,8 +1344,8 @@
         <translation>%1 のキー割り当て</translation>
     </message>
     <message>
-        <source>Map a Mac key or combination to a Windows key or combination. Source and target key choices are listed separately. Caps Lock mapped directly to a modifier uses a temporary macOS HID mapping so it stays held until release; the previous mapping is restored when streaming ends. Unmapped keys pass through unchanged.</source>
-        <translation>Macのキーや組み合わせをWindowsのキーや組み合わせに割り当てます。入力元と割り当て先のキーは別々に表示されます。Caps Lockを修飾キーに直接割り当てると、押している間保持されるようmacOSのHID設定を一時変更し、配信終了時に元へ戻します。未設定のキーはそのまま送信されます。</translation>
+        <source>Map a Mac key or combination to a Windows key or combination. Source and target key choices are listed separately. Caps Lock mapped directly to a modifier uses a temporary macOS HID mapping so it stays held until release and remains distinct from Option; F24 is reserved for this while streaming. The previous mapping is restored when streaming ends. Unmapped keys pass through unchanged.</source>
+        <translation>Macのキーや組み合わせをWindowsのキーや組み合わせに割り当てます。入力元と割り当て先のキーは別々に表示されます。Caps Lockを修飾キーに直接割り当てると、押している間保持され、Optionとも区別できるようmacOSのHID設定を一時変更します。この間F24は内部処理用に予約され、配信終了時に元のHID設定へ戻します。未設定のキーはそのまま送信されます。</translation>
     </message>
     <message>
         <source>Mapping %1</source>

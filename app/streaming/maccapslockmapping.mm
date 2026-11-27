@@ -11,30 +11,7 @@
 namespace {
 
 constexpr quint64 kCapsLockHidUsage = 0x700000039ULL;
-
-quint64 modifierHidUsage(SDL_Scancode scancode)
-{
-    switch (scancode) {
-    case SDL_SCANCODE_LCTRL:
-        return 0x7000000E0ULL;
-    case SDL_SCANCODE_LSHIFT:
-        return 0x7000000E1ULL;
-    case SDL_SCANCODE_LALT:
-        return 0x7000000E2ULL;
-    case SDL_SCANCODE_LGUI:
-        return 0x7000000E3ULL;
-    case SDL_SCANCODE_RCTRL:
-        return 0x7000000E4ULL;
-    case SDL_SCANCODE_RSHIFT:
-        return 0x7000000E5ULL;
-    case SDL_SCANCODE_RALT:
-        return 0x7000000E6ULL;
-    case SDL_SCANCODE_RGUI:
-        return 0x7000000E7ULL;
-    default:
-        return 0;
-    }
-}
+constexpr quint64 kCapsLockHidSentinelUsage = 0x700000073ULL;
 
 bool runHidutil(const QStringList& arguments, QByteArray* standardOutput)
 {
@@ -135,8 +112,7 @@ MacCapsLockMapping::~MacCapsLockMapping()
 
 bool MacCapsLockMapping::activate(SDL_Scancode targetKey)
 {
-    const quint64 targetUsage = modifierHidUsage(targetKey);
-    if (targetUsage == 0) {
+    if (KeyboardMappingStore::modifierForScancode(targetKey) == 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "Cannot map Caps Lock to unsupported HID modifier scancode %d",
                      targetKey);
@@ -172,8 +148,13 @@ bool MacCapsLockMapping::activate(SDL_Scancode targetKey)
     QJsonArray activeMappings;
     for (const QJsonValue& value : currentMappings) {
         const QJsonObject entry = value.toObject();
-        if (static_cast<quint64>(entry.value(QStringLiteral("HIDKeyboardModifierMappingSrc")).toDouble()) !=
-                kCapsLockHidUsage) {
+        const quint64 source =
+            static_cast<quint64>(entry.value(QStringLiteral("HIDKeyboardModifierMappingSrc")).toDouble());
+        const quint64 destination =
+            static_cast<quint64>(entry.value(QStringLiteral("HIDKeyboardModifierMappingDst")).toDouble());
+        if (source != kCapsLockHidUsage &&
+                source != kCapsLockHidSentinelUsage &&
+                destination != kCapsLockHidSentinelUsage) {
             activeMappings.append(value);
         }
     }
@@ -182,7 +163,7 @@ bool MacCapsLockMapping::activate(SDL_Scancode targetKey)
     capsLockMapping.insert(QStringLiteral("HIDKeyboardModifierMappingSrc"),
                            static_cast<double>(kCapsLockHidUsage));
     capsLockMapping.insert(QStringLiteral("HIDKeyboardModifierMappingDst"),
-                           static_cast<double>(targetUsage));
+                           static_cast<double>(kCapsLockHidSentinelUsage));
     activeMappings.append(capsLockMapping);
 
     if (!writeHidMappings(serializeHidMappings(activeMappings))) {
@@ -193,7 +174,7 @@ bool MacCapsLockMapping::activate(SDL_Scancode targetKey)
     m_IsActive = true;
     m_TargetKey = targetKey;
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "Temporarily mapped macOS Caps Lock to SDL scancode %d",
+                "Temporarily mapped macOS Caps Lock to F24 sentinel for SDL scancode %d",
                 targetKey);
     return true;
 }
