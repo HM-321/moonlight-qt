@@ -200,12 +200,6 @@ private:
 
     void handleMappedKeyEvent(SDL_KeyboardEvent* event, const KeyboardMapping& mapping);
 
-    int mapKeyboardModifiers(int sourceModifiers) const;
-
-    SDL_Scancode mapModifierScancode(SDL_Scancode sourceScancode) const;
-
-    void handleMappedModifierKeyEvent(SDL_KeyboardEvent* event, SDL_Scancode targetScancode);
-
     static
     Uint32 longPressTimerCallback(Uint32 interval, void* param);
 
@@ -238,12 +232,10 @@ private:
     GamepadState m_GamepadState[MAX_GAMEPADS];
     QSet<uint32_t> m_KeysDown;
     QList<KeyboardMapping> m_KeyboardMappings;
-    QList<ModifierMapping> m_ModifierMappings;
     QHash<SDL_Scancode, SDL_KeyboardEvent> m_PendingModifierKeyDowns;
     QSet<SDL_Scancode> m_ConsumedModifierKeyUps;
     QSet<SDL_Scancode> m_ForwardedModifierKeys;
     QHash<SDL_Scancode, KeyboardMapping> m_ActiveKeyboardMappings;
-    QHash<SDL_Scancode, SDL_Scancode> m_ActiveModifierMappings;
     bool m_BypassKeyboardMappings;
     bool m_ProcessingMappedKey;
     bool m_FakeMouseCaptureActive;

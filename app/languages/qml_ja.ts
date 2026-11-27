@@ -1344,8 +1344,8 @@
         <translation>%1 のキー割り当て</translation>
     </message>
     <message>
-        <source>Map an input key combination to a Windows key combination. Unmapped keys pass through unchanged.</source>
-        <translation>入力キーの組み合わせをWindowsのキーの組み合わせに割り当てます。未設定のキーはそのまま送信されます。</translation>
+        <source>Map any input key or combination to a Windows key or combination, including modifier keys. Unmapped keys pass through unchanged.</source>
+        <translation>修飾キーを含む任意の入力キーや組み合わせをWindowsのキーや組み合わせに割り当てます。未設定のキーはそのまま送信されます。</translation>
     </message>
     <message>
         <source>Mapping %1</source>
@@ -1368,8 +1368,8 @@
         <translation>割り当てを追加</translation>
     </message>
     <message>
-        <source>Could not save mappings. Input keys and modifier keys must be unique.</source>
-        <translation>保存できませんでした。入力キーと修飾キーの割り当ては重複できません。</translation>
+        <source>Could not save mappings. Each input shortcut must be unique.</source>
+        <translation>保存できませんでした。入力キーの組み合わせは重複できません。</translation>
     </message>
     <message>
         <source>Keyboard mappings saved.</source>
@@ -1378,30 +1378,6 @@
     <message>
         <source>Save</source>
         <translation>保存</translation>
-    </message>
-    <message>
-        <source>Control</source>
-        <translation>Control</translation>
-    </message>
-    <message>
-        <source>Option</source>
-        <translation>Option</translation>
-    </message>
-    <message>
-        <source>Alt</source>
-        <translation>Alt</translation>
-    </message>
-    <message>
-        <source>Shift</source>
-        <translation>Shift</translation>
-    </message>
-    <message>
-        <source>Command</source>
-        <translation>Command</translation>
-    </message>
-    <message>
-        <source>Windows key</source>
-        <translation>Windowsキー</translation>
     </message>
     <message>
         <source>Host keyboard settings</source>
@@ -1422,26 +1398,6 @@
     <message>
         <source>Prevents Caps Lock from lighting on the Mac while this stream is focused. The key is still sent to the Windows host, and the previous Mac state is restored when focus leaves or the stream ends.</source>
         <translation>ストリーミングにフォーカスがある間、MacのCaps Lockランプを消灯したままにします。キー入力はWindowsホストにも送信され、フォーカスが外れるかストリーミングが終了するとMac側の元の状態に戻ります。</translation>
-    </message>
-    <message>
-        <source>Standalone modifier mappings</source>
-        <translation>修飾キー単体の割り当て</translation>
-    </message>
-    <message>
-        <source>Map modifier keys by themselves. These mappings also apply when the modifier is held with another key.</source>
-        <translation>修飾キー単体の割り当てを設定します。ほかのキーと同時に押した場合にも適用されます。</translation>
-    </message>
-    <message>
-        <source>to</source>
-        <translation>→</translation>
-    </message>
-    <message>
-        <source>Add Modifier Mapping</source>
-        <translation>修飾キー割り当てを追加</translation>
-    </message>
-    <message>
-        <source>All modifier keys already have mappings.</source>
-        <translation>すべての修飾キーに割り当てがあります。</translation>
     </message>
 </context>
 </TS>

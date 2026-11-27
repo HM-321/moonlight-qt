@@ -14,12 +14,6 @@ struct KeyboardMapping
     int targetModifiers;
 };
 
-struct ModifierMapping
-{
-    int sourceModifier;
-    int targetModifier;
-};
-
 struct HostKeyboardSettings
 {
     bool macFunctionKeysOnFocus = false;
@@ -39,11 +33,9 @@ public:
     };
 
     static QList<KeyboardMapping> load(const QString& hostUuid);
-    static QList<ModifierMapping> loadModifierMappings(const QString& hostUuid);
     static HostKeyboardSettings loadHostSettings(const QString& hostUuid);
     static bool saveConfiguration(const QString& hostUuid,
                                   const QList<KeyboardMapping>& mappings,
-                                  const QList<ModifierMapping>& modifierMappings,
                                   const HostKeyboardSettings& hostSettings);
     static void remove(const QString& hostUuid);
     static QVariantList supportedKeys();

@@ -36,7 +36,6 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_NumFingersDown(0)
 {
     m_KeyboardMappings = KeyboardMappingStore::load(hostUuid);
-    m_ModifierMappings = KeyboardMappingStore::loadModifierMappings(hostUuid);
     m_BypassKeyboardMappings = false;
     m_ProcessingMappedKey = false;
 

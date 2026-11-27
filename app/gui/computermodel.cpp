@@ -138,18 +138,6 @@ QVariantList ComputerModel::getKeyboardMappings(const QString& hostUuid) const
     return result;
 }
 
-QVariantList ComputerModel::getModifierMappings(const QString& hostUuid) const
-{
-    QVariantList result;
-    for (const ModifierMapping& mapping : KeyboardMappingStore::loadModifierMappings(hostUuid)) {
-        QVariantMap item;
-        item.insert(QStringLiteral("sourceModifier"), mapping.sourceModifier);
-        item.insert(QStringLiteral("targetModifier"), mapping.targetModifier);
-        result.append(item);
-    }
-    return result;
-}
-
 QVariantMap ComputerModel::getHostKeyboardSettings(const QString& hostUuid) const
 {
     const HostKeyboardSettings settings = KeyboardMappingStore::loadHostSettings(hostUuid);
@@ -161,7 +149,6 @@ QVariantMap ComputerModel::getHostKeyboardSettings(const QString& hostUuid) cons
 
 bool ComputerModel::saveKeyboardConfiguration(const QString& hostUuid,
                                               const QVariantList& mappings,
-                                              const QVariantList& modifierMappings,
                                               const QVariantMap& hostSettings) const
 {
     QList<KeyboardMapping> parsedMappings;
@@ -176,16 +163,6 @@ bool ComputerModel::saveKeyboardConfiguration(const QString& hostUuid,
         parsedMappings.append(mapping);
     }
 
-    QList<ModifierMapping> parsedModifierMappings;
-    for (const QVariant& item : modifierMappings) {
-        const QVariantMap map = item.toMap();
-        ModifierMapping mapping = {
-            map.value(QStringLiteral("sourceModifier")).toInt(),
-            map.value(QStringLiteral("targetModifier")).toInt()
-        };
-        parsedModifierMappings.append(mapping);
-    }
-
     HostKeyboardSettings parsedHostSettings;
     parsedHostSettings.macFunctionKeysOnFocus =
         hostSettings.value(QStringLiteral("macFunctionKeysOnFocus")).toBool();
@@ -194,7 +171,6 @@ bool ComputerModel::saveKeyboardConfiguration(const QString& hostUuid,
 
     return KeyboardMappingStore::saveConfiguration(hostUuid,
                                                    parsedMappings,
-                                                   parsedModifierMappings,
                                                    parsedHostSettings);
 }
 

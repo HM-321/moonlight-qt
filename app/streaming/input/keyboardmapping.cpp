@@ -28,6 +28,8 @@ static QList<SDL_Scancode> supportedScancodes()
     }
 
     const SDL_Scancode specialScancodes[] = {
+        SDL_SCANCODE_LCTRL, SDL_SCANCODE_LSHIFT, SDL_SCANCODE_LALT, SDL_SCANCODE_LGUI,
+        SDL_SCANCODE_RCTRL, SDL_SCANCODE_RSHIFT, SDL_SCANCODE_RALT, SDL_SCANCODE_RGUI,
         SDL_SCANCODE_BACKSPACE, SDL_SCANCODE_TAB, SDL_SCANCODE_CLEAR,
         SDL_SCANCODE_KP_ENTER, SDL_SCANCODE_RETURN, SDL_SCANCODE_PAUSE,
         SDL_SCANCODE_CAPSLOCK, SDL_SCANCODE_ESCAPE, SDL_SCANCODE_SPACE,
@@ -99,49 +101,6 @@ QList<KeyboardMapping> KeyboardMappingStore::load(const QString& hostUuid)
     return mappings;
 }
 
-QList<ModifierMapping> KeyboardMappingStore::loadModifierMappings(const QString& hostUuid)
-{
-    QList<ModifierMapping> mappings;
-    if (hostUuid.isEmpty()) {
-        return mappings;
-    }
-
-    QSettings settings;
-    settings.beginGroup(QStringLiteral("keyboardmappings"));
-    settings.beginGroup(hostUuid);
-    const int count = settings.beginReadArray(QStringLiteral("modifierMappings"));
-    QSet<int> sourceModifiers;
-
-    for (int i = 0; i < count; i++) {
-        settings.setArrayIndex(i);
-
-        ModifierMapping mapping = {
-            settings.value(QStringLiteral("sourceModifier")).toInt(),
-            settings.value(QStringLiteral("targetModifier")).toInt()
-        };
-        if ((mapping.sourceModifier != ModifierCtrl &&
-             mapping.sourceModifier != ModifierAlt &&
-             mapping.sourceModifier != ModifierShift &&
-             mapping.sourceModifier != ModifierMeta) ||
-                (mapping.targetModifier != ModifierCtrl &&
-                 mapping.targetModifier != ModifierAlt &&
-                 mapping.targetModifier != ModifierShift &&
-                 mapping.targetModifier != ModifierMeta) ||
-                sourceModifiers.contains(mapping.sourceModifier)) {
-            qWarning() << "Ignoring invalid or duplicate saved modifier mapping for host" << hostUuid;
-            continue;
-        }
-
-        sourceModifiers.insert(mapping.sourceModifier);
-        mappings.append(mapping);
-    }
-
-    settings.endArray();
-    settings.endGroup();
-    settings.endGroup();
-    return mappings;
-}
-
 HostKeyboardSettings KeyboardMappingStore::loadHostSettings(const QString& hostUuid)
 {
     HostKeyboardSettings hostSettings;
@@ -171,7 +130,6 @@ HostKeyboardSettings KeyboardMappingStore::loadHostSettings(const QString& hostU
 
 bool KeyboardMappingStore::saveConfiguration(const QString& hostUuid,
                                              const QList<KeyboardMapping>& mappings,
-                                             const QList<ModifierMapping>& modifierMappings,
                                              const HostKeyboardSettings& hostSettings)
 {
     if (hostUuid.isEmpty()) {
@@ -194,23 +152,6 @@ bool KeyboardMappingStore::saveConfiguration(const QString& hostUuid,
         sourceChords.insert(sourceChord);
     }
 
-    QSet<int> sourceModifiers;
-    for (const ModifierMapping& mapping : modifierMappings) {
-        if ((mapping.sourceModifier != ModifierCtrl &&
-             mapping.sourceModifier != ModifierAlt &&
-             mapping.sourceModifier != ModifierShift &&
-             mapping.sourceModifier != ModifierMeta) ||
-                (mapping.targetModifier != ModifierCtrl &&
-                 mapping.targetModifier != ModifierAlt &&
-                 mapping.targetModifier != ModifierShift &&
-                 mapping.targetModifier != ModifierMeta) ||
-                sourceModifiers.contains(mapping.sourceModifier)) {
-            qWarning() << "Refusing to save invalid or duplicate modifier mappings for host" << hostUuid;
-            return false;
-        }
-        sourceModifiers.insert(mapping.sourceModifier);
-    }
-
     QSettings settings;
     settings.beginGroup(QStringLiteral("keyboardmappings"));
     settings.beginGroup(hostUuid);
@@ -223,14 +164,6 @@ bool KeyboardMappingStore::saveConfiguration(const QString& hostUuid,
         settings.setValue(QStringLiteral("sourceModifiers"), mapping.sourceModifiers);
         settings.setValue(QStringLiteral("targetKey"), static_cast<int>(mapping.targetKey));
         settings.setValue(QStringLiteral("targetModifiers"), mapping.targetModifiers);
-    }
-    settings.endArray();
-    settings.beginWriteArray(QStringLiteral("modifierMappings"), modifierMappings.size());
-    for (int i = 0; i < modifierMappings.size(); i++) {
-        const ModifierMapping& mapping = modifierMappings[i];
-        settings.setArrayIndex(i);
-        settings.setValue(QStringLiteral("sourceModifier"), mapping.sourceModifier);
-        settings.setValue(QStringLiteral("targetModifier"), mapping.targetModifier);
     }
     settings.endArray();
     settings.setValue(QStringLiteral("macFunctionKeysOnFocus"), hostSettings.macFunctionKeysOnFocus);
