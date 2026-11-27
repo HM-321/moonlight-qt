@@ -230,9 +230,11 @@ void SdlInputHandler::handleMappedKeyEvent(SDL_KeyboardEvent* event, const Keybo
 {
     const int keyModifier = KeyboardMappingStore::modifierForScancode(mapping.targetKey);
     const int targetModifiers = mapping.targetModifiers & ~keyModifier;
-    const int eventModifiers = event->state == SDL_PRESSED ?
-                                   targetModifiers | keyModifier :
-                                   targetModifiers;
+    // A modifier key is represented by its own key down/up event. Including the
+    // same modifier in that event's modifier flags makes the down and up states
+    // asymmetric and can cause the host to treat it as a momentary press. The
+    // held modifier is added to subsequent key events by mappedModifiersForEvent().
+    const int eventModifiers = targetModifiers;
 
     SDL_KeyboardEvent mappedEvent = *event;
     mappedEvent.keysym.scancode = mapping.targetKey;

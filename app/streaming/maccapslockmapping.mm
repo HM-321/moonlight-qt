@@ -171,6 +171,43 @@ bool MacCapsLockMapping::activate(SDL_Scancode targetKey)
         return false;
     }
 
+    // hidutil may exit successfully even when the effective mapping was not
+    // installed for the active keyboard. Read it back before disabling the
+    // normal SDL Caps Lock path. If verification fails, restore the previous
+    // mapping and let the caller fall back to ordinary SDL key mapping.
+    QByteArray verificationOutput;
+    QJsonArray verificationMappings;
+    if (!runHidutil({QStringLiteral("property"),
+                     QStringLiteral("--get"),
+                     QStringLiteral("UserKeyMapping")},
+                    &verificationOutput) ||
+            !parseHidMappings(verificationOutput, verificationMappings)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "Failed to verify temporary Caps Lock HID mapping");
+        restore();
+        return false;
+    }
+
+    bool mappingInstalled = false;
+    for (const QJsonValue& value : verificationMappings) {
+        const QJsonObject entry = value.toObject();
+        const quint64 source = static_cast<quint64>(
+            entry.value(QStringLiteral("HIDKeyboardModifierMappingSrc")).toDouble());
+        const quint64 destination = static_cast<quint64>(
+            entry.value(QStringLiteral("HIDKeyboardModifierMappingDst")).toDouble());
+        if (source == kCapsLockHidUsage && destination == kCapsLockHidSentinelUsage) {
+            mappingInstalled = true;
+            break;
+        }
+    }
+
+    if (!mappingInstalled) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "Temporary Caps Lock to F24 HID mapping was not installed");
+        restore();
+        return false;
+    }
+
     m_IsActive = true;
     m_TargetKey = targetKey;
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
