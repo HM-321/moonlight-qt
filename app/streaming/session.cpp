@@ -1927,10 +1927,16 @@ void Session::exec()
 
 #ifdef Q_OS_DARWIN
     const SDL_Scancode capsLockTarget = macCapsLockModifierTarget(m_Computer->uuid);
-    if (capsLockTarget != SDL_SCANCODE_UNKNOWN &&
-            !m_MacCapsLockMapping.activate(capsLockTarget)) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "Caps Lock HID modifier mapping is unavailable; using SDL key mapping");
+    if (capsLockTarget != SDL_SCANCODE_UNKNOWN) {
+        if (m_MacCapsLockMapping.activate(capsLockTarget)) {
+            // Right Control is a private relay. The input handler consumes it
+            // before normal per-host mappings and emits the configured target.
+            m_InputHandler->setMacHidCapsLockTarget(capsLockTarget);
+        }
+        else {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "Caps Lock HID relay mapping is unavailable; using SDL key mapping");
+        }
     }
 
     if (m_MacFunctionKeysOnFocus &&

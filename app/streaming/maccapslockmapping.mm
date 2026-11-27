@@ -11,7 +11,7 @@
 namespace {
 
 constexpr quint64 kCapsLockHidUsage = 0x700000039ULL;
-constexpr quint64 kCapsLockHidSentinelUsage = 0x700000073ULL;
+constexpr quint64 kCapsLockHidSentinelUsage = 0x7000000E4ULL;
 
 quint64 hidUsageForModifierScancode(SDL_Scancode scancode)
 {
@@ -188,7 +188,7 @@ bool MacCapsLockMapping::activate(SDL_Scancode targetKey)
     capsLockMapping.insert(QStringLiteral("HIDKeyboardModifierMappingSrc"),
                            static_cast<double>(kCapsLockHidUsage));
     capsLockMapping.insert(QStringLiteral("HIDKeyboardModifierMappingDst"),
-                           static_cast<double>(targetUsage));
+                           static_cast<double>(kCapsLockHidSentinelUsage));
     activeMappings.append(capsLockMapping);
 
     if (!writeHidMappings(serializeHidMappings(activeMappings))) {
@@ -220,7 +220,8 @@ bool MacCapsLockMapping::activate(SDL_Scancode targetKey)
             entry.value(QStringLiteral("HIDKeyboardModifierMappingSrc")).toDouble());
         const quint64 destination = static_cast<quint64>(
             entry.value(QStringLiteral("HIDKeyboardModifierMappingDst")).toDouble());
-        if (source == kCapsLockHidUsage && destination == targetUsage) {
+        if (source == kCapsLockHidUsage &&
+                destination == kCapsLockHidSentinelUsage) {
             mappingInstalled = true;
             break;
         }
@@ -228,7 +229,7 @@ bool MacCapsLockMapping::activate(SDL_Scancode targetKey)
 
     if (!mappingInstalled) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "Temporary Caps Lock HID modifier mapping was not installed");
+                     "Temporary Caps Lock to Right Control relay was not installed");
         restore();
         return false;
     }
@@ -236,7 +237,7 @@ bool MacCapsLockMapping::activate(SDL_Scancode targetKey)
     m_IsActive = true;
     m_TargetKey = targetKey;
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "Temporarily mapped macOS Caps Lock directly to HID modifier scancode %d",
+                "Temporarily mapped macOS Caps Lock to Right Control relay for target scancode %d",
                 targetKey);
     return true;
 }
