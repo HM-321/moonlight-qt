@@ -458,7 +458,8 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
     }
 
     SDL_KeyboardEvent normalizedEvent = *event;
-    normalizedEvent.keysym.mod = mappedModifiersForEvent(event->keysym.mod);
+    normalizedEvent.keysym.mod = mappedModifiersForEvent(
+        static_cast<SDL_Keymod>(event->keysym.mod));
     event = &normalizedEvent;
 
     // Set modifier flags
