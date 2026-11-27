@@ -179,7 +179,7 @@ bool KeyboardMappingStore::isSupportedKey(SDL_Scancode scancode)
     return supportedScancodes().contains(scancode);
 }
 
-int KeyboardMappingStore::modifiersFromSdl(SDL_Keymod modifiers)
+int KeyboardMappingStore::modifiersFromSdl(Uint16 modifiers)
 {
     int result = 0;
     if (modifiers & KMOD_CTRL) {

@@ -31,7 +31,7 @@ public:
     static void remove(const QString& hostUuid);
     static QVariantList supportedKeys();
     static bool isSupportedKey(SDL_Scancode scancode);
-    static int modifiersFromSdl(SDL_Keymod modifiers);
+    static int modifiersFromSdl(Uint16 modifiers);
     static SDL_Keymod modifiersToSdl(int modifiers);
     static int modifierForScancode(SDL_Scancode scancode);
 };
