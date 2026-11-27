@@ -16,7 +16,8 @@ class ComputerModel : public QAbstractListModel
         WakeableRole,
         StatusUnknownRole,
         ServerSupportedRole,
-        DetailsRole
+        DetailsRole,
+        UuidRole
     };
 
 public:
@@ -42,6 +43,12 @@ public:
     Q_INVOKABLE void wakeComputer(int computerIndex);
 
     Q_INVOKABLE void renameComputer(int computerIndex, QString name);
+
+    Q_INVOKABLE QVariantList keyboardMappingKeys() const;
+
+    Q_INVOKABLE QVariantList getKeyboardMappings(const QString& hostUuid) const;
+
+    Q_INVOKABLE bool saveKeyboardMappings(const QString& hostUuid, const QVariantList& mappings) const;
 
     Q_INVOKABLE Session* createSessionForCurrentGame(int computerIndex);
 

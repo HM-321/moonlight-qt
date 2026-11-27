@@ -1,6 +1,8 @@
 #include "computermodel.h"
 
 #include <QThreadPool>
+#include <QVariantMap>
+#include "streaming/input/keyboardmapping.h"
 
 ComputerModel::ComputerModel(QObject* object)
     : QAbstractListModel(object) {}
@@ -82,6 +84,8 @@ QVariant ComputerModel::data(const QModelIndex& index, int role) const
                tr("Running Game ID: %1").arg(computer->state == NvComputer::CS_ONLINE ? QString::number(computer->currentGameId) : tr("Unknown")) + '\n' +
                tr("HTTPS Port: %1").arg(computer->state == NvComputer::CS_ONLINE ? QString::number(computer->activeHttpsPort) : tr("Unknown"));
     }
+    case UuidRole:
+        return computer->uuid;
     default:
         return QVariant();
     }
@@ -110,8 +114,44 @@ QHash<int, QByteArray> ComputerModel::roleNames() const
     names[StatusUnknownRole] = "statusUnknown";
     names[ServerSupportedRole] = "serverSupported";
     names[DetailsRole] = "details";
+    names[UuidRole] = "uuid";
 
     return names;
+}
+
+QVariantList ComputerModel::keyboardMappingKeys() const
+{
+    return KeyboardMappingStore::supportedKeys();
+}
+
+QVariantList ComputerModel::getKeyboardMappings(const QString& hostUuid) const
+{
+    QVariantList result;
+    for (const KeyboardMapping& mapping : KeyboardMappingStore::load(hostUuid)) {
+        QVariantMap item;
+        item.insert(QStringLiteral("sourceKey"), static_cast<int>(mapping.sourceKey));
+        item.insert(QStringLiteral("sourceModifiers"), mapping.sourceModifiers);
+        item.insert(QStringLiteral("targetKey"), static_cast<int>(mapping.targetKey));
+        item.insert(QStringLiteral("targetModifiers"), mapping.targetModifiers);
+        result.append(item);
+    }
+    return result;
+}
+
+bool ComputerModel::saveKeyboardMappings(const QString& hostUuid, const QVariantList& mappings) const
+{
+    QList<KeyboardMapping> parsedMappings;
+    for (const QVariant& item : mappings) {
+        const QVariantMap map = item.toMap();
+        KeyboardMapping mapping = {
+            static_cast<SDL_Scancode>(map.value(QStringLiteral("sourceKey")).toInt()),
+            map.value(QStringLiteral("sourceModifiers")).toInt(),
+            static_cast<SDL_Scancode>(map.value(QStringLiteral("targetKey")).toInt()),
+            map.value(QStringLiteral("targetModifiers")).toInt()
+        };
+        parsedMappings.append(mapping);
+    }
+    return KeyboardMappingStore::save(hostUuid, parsedMappings);
 }
 
 Session* ComputerModel::createSessionForCurrentGame(int computerIndex)
@@ -139,6 +179,8 @@ void ComputerModel::deleteComputer(int computerIndex)
     Q_ASSERT(computerIndex >= 0 && computerIndex < m_Computers.count());
 
     beginRemoveRows(QModelIndex(), computerIndex, computerIndex);
+
+    KeyboardMappingStore::remove(m_Computers[computerIndex]->uuid);
 
     // m_Computer[computerIndex] will be deleted by this call
     m_ComputerManager->deleteHost(m_Computers[computerIndex]);

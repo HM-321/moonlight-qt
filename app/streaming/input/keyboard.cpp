@@ -182,6 +182,84 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
     }
 }
 
+bool SdlInputHandler::handleSpecialKeyComboIfAny(SDL_KeyboardEvent* event)
+{
+    if (event->state != SDL_PRESSED ||
+            !(event->keysym.mod & KMOD_CTRL) ||
+            !(event->keysym.mod & KMOD_ALT) ||
+            !(event->keysym.mod & KMOD_SHIFT)) {
+        return false;
+    }
+
+    for (int i = 0; i < KeyComboMax; i++) {
+        if (m_SpecialKeyCombos[i].enabled && event->keysym.sym == m_SpecialKeyCombos[i].keyCode) {
+            flushPendingModifierKeyDowns();
+            performSpecialKeyCombo(m_SpecialKeyCombos[i].keyCombo);
+            return true;
+        }
+    }
+
+    for (int i = 0; i < KeyComboMax; i++) {
+        if (m_SpecialKeyCombos[i].enabled && event->keysym.scancode == m_SpecialKeyCombos[i].scanCode) {
+            flushPendingModifierKeyDowns();
+            performSpecialKeyCombo(m_SpecialKeyCombos[i].keyCombo);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void SdlInputHandler::handleKeyEventDirect(SDL_KeyboardEvent* event, bool mapped)
+{
+    const bool bypassKeyboardMappings = m_BypassKeyboardMappings;
+    const bool processingMappedKey = m_ProcessingMappedKey;
+    m_BypassKeyboardMappings = true;
+    m_ProcessingMappedKey = mapped;
+    handleKeyEvent(event);
+    m_BypassKeyboardMappings = bypassKeyboardMappings;
+    m_ProcessingMappedKey = processingMappedKey;
+}
+
+void SdlInputHandler::handleMappedKeyEvent(SDL_KeyboardEvent* event, const KeyboardMapping& mapping)
+{
+    SDL_KeyboardEvent mappedEvent = *event;
+    mappedEvent.keysym.scancode = mapping.targetKey;
+    mappedEvent.keysym.mod = static_cast<SDL_Keymod>(
+        KeyboardMappingStore::modifiersToSdl(mapping.targetModifiers) |
+        (event->keysym.mod & (KMOD_CAPS | KMOD_NUM)));
+
+    if (event->state == SDL_PRESSED &&
+            (mapping.targetModifiers & KeyboardMappingStore::ModifierMeta)) {
+        SDL_KeyboardEvent metaEvent = mappedEvent;
+        metaEvent.keysym.scancode = SDL_SCANCODE_LGUI;
+        metaEvent.keysym.mod = static_cast<SDL_Keymod>(KMOD_GUI |
+            (event->keysym.mod & (KMOD_CAPS | KMOD_NUM)));
+        handleKeyEventDirect(&metaEvent, true);
+    }
+
+    handleKeyEventDirect(&mappedEvent, true);
+
+    if (event->state == SDL_RELEASED &&
+            (mapping.targetModifiers & KeyboardMappingStore::ModifierMeta)) {
+        SDL_KeyboardEvent metaEvent = mappedEvent;
+        metaEvent.keysym.scancode = SDL_SCANCODE_LGUI;
+        metaEvent.keysym.mod = static_cast<SDL_Keymod>(event->keysym.mod & (KMOD_CAPS | KMOD_NUM));
+        handleKeyEventDirect(&metaEvent, true);
+    }
+}
+
+void SdlInputHandler::flushPendingModifierKeyDowns()
+{
+    const QList<SDL_Scancode> pendingScancodes = m_PendingModifierKeyDowns.keys();
+    for (SDL_Scancode scancode : pendingScancodes) {
+        SDL_KeyboardEvent event = m_PendingModifierKeyDowns.value(scancode);
+        m_ForwardedModifierKeys.insert(scancode);
+        handleKeyEventDirect(&event);
+    }
+    m_PendingModifierKeyDowns.clear();
+}
+
 void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
 {
     short keyCode;
@@ -195,34 +273,75 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
         return;
     }
 
-    // Check for our special key combos
-    if ((event->state == SDL_PRESSED) &&
-            (event->keysym.mod & KMOD_CTRL) &&
-            (event->keysym.mod & KMOD_ALT) &&
-            (event->keysym.mod & KMOD_SHIFT)) {
-        // First we test the SDLK combos for matches,
-        // that way we ensure that latin keyboard users
-        // can match to the key they see on their keyboards.
-        // If nothing matches that, we'll then go on to
-        // checking scancodes so non-latin keyboard users
-        // can have working hotkeys (though possibly in
-        // odd positions). We must do all SDLK tests before
-        // any scancode tests to avoid issues in cases
-        // where the SDLK for one shortcut collides with
-        // the scancode of another.
+    if (!m_BypassKeyboardMappings &&
+            event->state == SDL_PRESSED &&
+            handleSpecialKeyComboIfAny(event)) {
+        return;
+    }
 
-        for (int i = 0; i < KeyComboMax; i++) {
-            if (m_SpecialKeyCombos[i].enabled && event->keysym.sym == m_SpecialKeyCombos[i].keyCode) {
-                performSpecialKeyCombo(m_SpecialKeyCombos[i].keyCombo);
+    if (!m_BypassKeyboardMappings && !m_KeyboardMappings.isEmpty()) {
+        const SDL_Scancode sourceScancode = event->keysym.scancode;
+        const int sourceModifier = KeyboardMappingStore::modifierForScancode(sourceScancode);
+
+        if (sourceModifier != 0) {
+            if (event->state == SDL_PRESSED) {
+                m_PendingModifierKeyDowns.insert(sourceScancode, *event);
                 return;
             }
+
+            if (m_ConsumedModifierKeyUps.remove(sourceScancode)) {
+                return;
+            }
+
+            auto pendingModifier = m_PendingModifierKeyDowns.find(sourceScancode);
+            if (pendingModifier != m_PendingModifierKeyDowns.end()) {
+                SDL_KeyboardEvent keyDownEvent = pendingModifier.value();
+                m_PendingModifierKeyDowns.erase(pendingModifier);
+                handleKeyEventDirect(&keyDownEvent);
+                handleKeyEventDirect(event);
+                return;
+            }
+
+            m_ForwardedModifierKeys.remove(sourceScancode);
         }
+        else {
+            if (event->state == SDL_PRESSED) {
+                const int sourceModifiers = KeyboardMappingStore::modifiersFromSdl(event->keysym.mod);
+                for (const KeyboardMapping& mapping : std::as_const(m_KeyboardMappings)) {
+                    if (mapping.sourceKey != sourceScancode || mapping.sourceModifiers != sourceModifiers) {
+                        continue;
+                    }
 
-        for (int i = 0; i < KeyComboMax; i++) {
-            if (m_SpecialKeyCombos[i].enabled && event->keysym.scancode == m_SpecialKeyCombos[i].scanCode) {
-                performSpecialKeyCombo(m_SpecialKeyCombos[i].keyCombo);
-                return;
+                    int forwardedModifiers = 0;
+                    for (SDL_Scancode forwardedKey : std::as_const(m_ForwardedModifierKeys)) {
+                        forwardedModifiers |= KeyboardMappingStore::modifierForScancode(forwardedKey);
+                    }
+                    if (forwardedModifiers & mapping.sourceModifiers) {
+                        break;
+                    }
+
+                    const QList<SDL_Scancode> pendingScancodes = m_PendingModifierKeyDowns.keys();
+                    for (SDL_Scancode scancode : pendingScancodes) {
+                        m_ConsumedModifierKeyUps.insert(scancode);
+                    }
+                    m_PendingModifierKeyDowns.clear();
+                    m_ActiveKeyboardMappings.insert(sourceScancode, mapping);
+
+                    handleMappedKeyEvent(event, mapping);
+                    return;
+                }
             }
+            else {
+                auto activeMapping = m_ActiveKeyboardMappings.find(sourceScancode);
+                if (activeMapping != m_ActiveKeyboardMappings.end()) {
+                    const KeyboardMapping mapping = activeMapping.value();
+                    m_ActiveKeyboardMappings.erase(activeMapping);
+                    handleMappedKeyEvent(event, mapping);
+                    return;
+                }
+            }
+
+            flushPendingModifierKeyDowns();
         }
     }
 
@@ -238,7 +357,7 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
         modifiers |= MODIFIER_SHIFT;
     }
     if (event->keysym.mod & KMOD_GUI) {
-        if (isSystemKeyCaptureActive()) {
+        if (isSystemKeyCaptureActive() || m_ProcessingMappedKey) {
             modifiers |= MODIFIER_META;
         }
     }
@@ -399,14 +518,14 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
                 modifiers |= MODIFIER_EXTENDED;
                 break;
             case SDL_SCANCODE_LGUI:
-                if (!isSystemKeyCaptureActive()) {
+                if (!isSystemKeyCaptureActive() && !m_ProcessingMappedKey) {
                     return;
                 }
                 keyCode = 0x5B;
                 modifiers |= MODIFIER_EXTENDED;
                 break;
             case SDL_SCANCODE_RGUI:
-                if (!isSystemKeyCaptureActive()) {
+                if (!isSystemKeyCaptureActive() && !m_ProcessingMappedKey) {
                     return;
                 }
                 keyCode = 0x5C;
@@ -521,6 +640,10 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
 void SdlInputHandler::raiseAllKeys()
 {
     if (m_KeysDown.isEmpty()) {
+        m_PendingModifierKeyDowns.clear();
+        m_ConsumedModifierKeyUps.clear();
+        m_ForwardedModifierKeys.clear();
+        m_ActiveKeyboardMappings.clear();
         return;
     }
 
@@ -536,4 +659,8 @@ void SdlInputHandler::raiseAllKeys()
     }
 
     m_KeysDown.clear();
+    m_PendingModifierKeyDowns.clear();
+    m_ConsumedModifierKeyUps.clear();
+    m_ForwardedModifierKeys.clear();
+    m_ActiveKeyboardMappings.clear();
 }

@@ -261,6 +261,10 @@
         <translation>PCの名前を変更</translation>
     </message>
     <message>
+        <source>Configure Keyboard</source>
+        <translation>キーボード設定</translation>
+    </message>
+    <message>
         <location filename="../gui/PcView.qml" line="205"/>
         <source>Delete PC</source>
         <translation>PCを削除</translation>
@@ -1333,6 +1337,57 @@
         <location filename="../gui/main.qml" line="517"/>
         <source>Enter the IP address of your host PC:</source>
         <translation>ホストPCのIPアドレスを入力してください:</translation>
+    </message>
+</context>
+<context>
+    <name>KeyboardMappingView</name>
+    <message>
+        <source>Keyboard Mapping</source>
+        <translation>キー割り当て</translation>
+    </message>
+    <message>
+        <source>None</source>
+        <translation>なし</translation>
+    </message>
+    <message>
+        <source>Keyboard mappings for %1</source>
+        <translation>%1 のキー割り当て</translation>
+    </message>
+    <message>
+        <source>Map an input key combination to a Windows key combination. Unmapped keys pass through unchanged.</source>
+        <translation>入力キーの組み合わせをWindowsのキーの組み合わせに割り当てます。未設定のキーはそのまま送信されます。</translation>
+    </message>
+    <message>
+        <source>Mapping %1</source>
+        <translation>割り当て %1</translation>
+    </message>
+    <message>
+        <source>When</source>
+        <translation>入力</translation>
+    </message>
+    <message>
+        <source>Send as</source>
+        <translation>送信先</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation>削除</translation>
+    </message>
+    <message>
+        <source>Add Mapping</source>
+        <translation>割り当てを追加</translation>
+    </message>
+    <message>
+        <source>Could not save mappings. Each input shortcut must be unique.</source>
+        <translation>保存できませんでした。入力キーの組み合わせは重複できません。</translation>
+    </message>
+    <message>
+        <source>Keyboard mappings saved.</source>
+        <translation>キー割り当てを保存しました。</translation>
+    </message>
+    <message>
+        <source>Save</source>
+        <translation>保存</translation>
     </message>
 </context>
 </TS>
