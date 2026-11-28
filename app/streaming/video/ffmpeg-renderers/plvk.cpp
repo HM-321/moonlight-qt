@@ -1029,23 +1029,13 @@ void PlVkRenderer::renderFrame(AVFrame *frame)
         return;
     }
 
-    // Adjust the swapchain if the colorspace of incoming frames has changed
-    if (!pl_color_space_equal(&mappedFrame.color, &m_LastColorspace)) {
+    // Adjust the swapchain after submitting the current frame if the colorspace
+    // of incoming frames has changed. pl_swapchain_start_frame() holds a lock
+    // until pl_swapchain_submit_frame() is called.
+    bool colorspaceChanged = !pl_color_space_equal(&mappedFrame.color, &m_LastColorspace);
+    if (colorspaceChanged) {
         m_LastColorspace = mappedFrame.color;
         SDL_assert(pl_color_space_equal(&mappedFrame.color, &m_LastColorspace));
-
-#ifdef Q_OS_DARWIN
-        // There is a gamma mismatch on macOS between what libplacebo thinks BT.709
-        // should use and what the Metal layer actually displays. Use sRGB for the
-        // swapchain when the incoming frames are BT.709 as a workaround.
-        if (pl_color_space_equal(&mappedFrame.color, &pl_color_space_bt709)) {
-            pl_swapchain_colorspace_hint(m_Swapchain, &pl_color_space_srgb);
-        }
-        else
-#endif
-        {
-            pl_swapchain_colorspace_hint(m_Swapchain, &mappedFrame.color);
-        }
     }
 
     // Reserve enough space to avoid allocating under the overlay lock
@@ -1152,6 +1142,21 @@ void PlVkRenderer::renderFrame(AVFrame *frame)
         event.type = SDL_RENDER_DEVICE_RESET;
         SDL_PushEvent(&event);
         goto UnmapExit;
+    }
+
+    if (colorspaceChanged) {
+#ifdef Q_OS_DARWIN
+        // There is a gamma mismatch on macOS between what libplacebo thinks BT.709
+        // should use and what the Metal layer actually displays. Use sRGB for the
+        // swapchain when the incoming frames are BT.709 as a workaround.
+        if (pl_color_space_equal(&mappedFrame.color, &pl_color_space_bt709)) {
+            pl_swapchain_colorspace_hint(m_Swapchain, &pl_color_space_srgb);
+        }
+        else
+#endif
+        {
+            pl_swapchain_colorspace_hint(m_Swapchain, &mappedFrame.color);
+        }
     }
 
 #ifndef PLVK_USE_EARLY_RENDER_TO_WAIT

@@ -9,6 +9,10 @@ on:
       ci_version:
         required: true
         type: string
+      target:
+        required: false
+        type: string
+        default: all
 
 jobs:
   build:
@@ -16,14 +20,7 @@ jobs:
       CI_VERSION: ${{ inputs.ci_version }}
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          # Windows
-          - os: windows-2025
-            qt_version: 6.12.1
-          # macOS
-          - os: macos-26
-            qt_version: 6.11.3
+      matrix: ${{ fromJSON(inputs.target == 'macos' && '{"include":[{"os":"macos-26","qt_version":"6.11.3"}]}' || '{"include":[{"os":"windows-2025","qt_version":"6.12.1"},{"os":"macos-26","qt_version":"6.11.3"}]}') }}
 
     runs-on: ${{ matrix.os }}
 
@@ -54,6 +51,26 @@ jobs:
           version: ${{ matrix.qt_version }}
           aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e'
 
+      - name: Install ccache (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ccache
+
+      - name: Cache ccache (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/ccache
+          key: ccache-${{ runner.os }}-${{ matrix.qt_version }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ matrix.qt_version }}-
+
+      - name: Configure ccache (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p "$HOME/Library/Caches/ccache"
+          echo "CCACHE_DIR=$HOME/Library/Caches/ccache" >> "$GITHUB_ENV"
+          ccache --max-size=2G
+
       - name: Install Qt ARM64 (Windows)
         if: runner.os == 'Windows'
         uses: jurplel/install-qt-action@v4
@@ -82,6 +99,10 @@ jobs:
         env:
           QT_PATH: ${{ runner.workspace }}\Qt\${{ matrix.qt_version }}\msvc2022_arm64\bin
 
+      - name: Compile Japanese translation (macOS)
+        if: runner.os == 'macOS'
+        run: lrelease app/languages/qml_ja.ts -qm app/languages/qml_ja.qm
+
       - name: Build Package
         shell: pwsh
         run: |
@@ -90,6 +111,13 @@ jobs:
           } else {
             bash scripts/generate-dmg.sh Release
           }
+
+      - name: Create App Bundle ZIP (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            build/build-Release/app/Moonlight.app \
+            build/installer-Release/Moonlight-${CI_VERSION}.zip
 
       - name: Upload Binaries (Windows x64)
         uses: actions/upload-artifact@v6
@@ -113,6 +141,15 @@ jobs:
         with:
           name: Moonlight-${{ runner.os }}-${{ env.CI_VERSION }}
           path: build/installer-Release/*.dmg
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Upload App Bundle ZIP (macOS)
+        uses: actions/upload-artifact@v6
+        if: runner.os == 'macOS'
+        with:
+          name: Moonlight-${{ runner.os }}-App-${{ env.CI_VERSION }}
+          path: build/installer-Release/Moonlight-${{ env.CI_VERSION }}.zip
           compression-level: 0
           if-no-files-found: error
 

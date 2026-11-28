@@ -2,6 +2,7 @@
 #include "streaming/session.h"
 
 #include <QAbstractListModel>
+#include <QVariantMap>
 
 class ComputerModel : public QAbstractListModel
 {
@@ -16,7 +17,8 @@ class ComputerModel : public QAbstractListModel
         WakeableRole,
         StatusUnknownRole,
         ServerSupportedRole,
-        DetailsRole
+        DetailsRole,
+        UuidRole
     };
 
 public:
@@ -42,6 +44,18 @@ public:
     Q_INVOKABLE void wakeComputer(int computerIndex);
 
     Q_INVOKABLE void renameComputer(int computerIndex, QString name);
+
+    Q_INVOKABLE QVariantList keyboardMappingSourceKeys() const;
+
+    Q_INVOKABLE QVariantList keyboardMappingTargetKeys() const;
+
+    Q_INVOKABLE QVariantList getKeyboardMappings(const QString& hostUuid) const;
+
+    Q_INVOKABLE QVariantMap getHostKeyboardSettings(const QString& hostUuid) const;
+
+    Q_INVOKABLE bool saveKeyboardConfiguration(const QString& hostUuid,
+                                               const QVariantList& mappings,
+                                               const QVariantMap& hostSettings) const;
 
     Q_INVOKABLE Session* createSessionForCurrentGame(int computerIndex);
 

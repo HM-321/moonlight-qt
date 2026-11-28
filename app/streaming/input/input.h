@@ -2,8 +2,12 @@
 
 #include "settings/streamingpreferences.h"
 #include "backend/computermanager.h"
+#include "keyboardmapping.h"
 
 #include "SDL_compat.h"
+
+#include <QHash>
+#include <QSet>
 
 struct GamepadState {
     SDL_GameController* controller;
@@ -84,11 +88,13 @@ struct DualSenseOutputReport{
 class SdlInputHandler
 {
 public:
-    explicit SdlInputHandler(StreamingPreferences& prefs, int streamWidth, int streamHeight);
+    explicit SdlInputHandler(StreamingPreferences& prefs, int streamWidth, int streamHeight, const QString& hostUuid);
 
     ~SdlInputHandler();
 
     void setWindow(SDL_Window* window);
+
+    void setMacHidCapsLockTarget(SDL_Scancode scancode);
 
     void handleKeyEvent(SDL_KeyboardEvent* event);
 
@@ -188,6 +194,16 @@ private:
 
     void performSpecialKeyCombo(KeyCombo combo);
 
+    bool handleSpecialKeyComboIfAny(SDL_KeyboardEvent* event);
+
+    void handleKeyEventDirect(SDL_KeyboardEvent* event, bool mapped = false);
+
+    void handleMappedKeyEvent(SDL_KeyboardEvent* event, const KeyboardMapping& mapping);
+
+    SDL_Keymod mappedModifiersForEvent(SDL_Keymod sourceModifiers) const;
+
+    bool hasMappedMetaModifierActive() const;
+
     static
     Uint32 longPressTimerCallback(Uint32 interval, void* param);
 
@@ -219,6 +235,15 @@ private:
     int m_GamepadMask;
     GamepadState m_GamepadState[MAX_GAMEPADS];
     QSet<uint32_t> m_KeysDown;
+    QList<KeyboardMapping> m_KeyboardMappings;
+    QSet<SDL_Scancode> m_ConsumedModifierKeyUps;
+    QSet<SDL_Scancode> m_ForwardedModifierKeys;
+    QHash<SDL_Scancode, KeyboardMapping> m_ActiveKeyboardMappings;
+    SDL_Scancode m_MacHidCapsLockTarget = SDL_SCANCODE_UNKNOWN;
+    bool m_MacHidCapsLockDown = false;
+    bool m_MacJapaneseInputKeys;
+    bool m_BypassKeyboardMappings;
+    bool m_ProcessingMappedKey;
     bool m_FakeMouseCaptureActive;
     bool m_KeyboardCaptureActive;
     QString m_OldIgnoreDevices;

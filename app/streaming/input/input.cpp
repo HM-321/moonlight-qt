@@ -9,7 +9,7 @@
 #include <QDir>
 #include <QGuiApplication>
 
-SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, int streamHeight)
+SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, int streamHeight, const QString& hostUuid)
     : m_MultiController(prefs.multiController),
       m_GamepadMouse(prefs.gamepadMouse),
       m_SwapMouseButtons(prefs.swapMouseButtons),
@@ -35,6 +35,11 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_DragButton(0),
       m_NumFingersDown(0)
 {
+    m_KeyboardMappings = KeyboardMappingStore::load(hostUuid);
+    m_MacJapaneseInputKeys = KeyboardMappingStore::loadHostSettings(hostUuid).macJapaneseInputKeys;
+    m_BypassKeyboardMappings = false;
+    m_ProcessingMappedKey = false;
+
     // System keys are always captured when running without a DE
     if (!WMUtils::isRunningDesktopEnvironment()) {
         m_CaptureSystemKeysMode = StreamingPreferences::CSK_ALWAYS;
@@ -268,6 +273,12 @@ SdlInputHandler::~SdlInputHandler()
 void SdlInputHandler::setWindow(SDL_Window *window)
 {
     m_Window = window;
+}
+
+void SdlInputHandler::setMacHidCapsLockTarget(SDL_Scancode scancode)
+{
+    m_MacHidCapsLockTarget = scancode;
+    m_MacHidCapsLockDown = false;
 }
 
 void SdlInputHandler::notifyFocusLost()

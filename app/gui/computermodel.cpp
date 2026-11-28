@@ -1,6 +1,8 @@
 #include "computermodel.h"
 
 #include <QThreadPool>
+#include <QVariantMap>
+#include "streaming/input/keyboardmapping.h"
 
 ComputerModel::ComputerModel(QObject* object)
     : QAbstractListModel(object) {}
@@ -82,6 +84,8 @@ QVariant ComputerModel::data(const QModelIndex& index, int role) const
                tr("Running Game ID: %1").arg(computer->state == NvComputer::CS_ONLINE ? QString::number(computer->currentGameId) : tr("Unknown")) + '\n' +
                tr("HTTPS Port: %1").arg(computer->state == NvComputer::CS_ONLINE ? QString::number(computer->activeHttpsPort) : tr("Unknown"));
     }
+    case UuidRole:
+        return computer->uuid;
     default:
         return QVariant();
     }
@@ -110,8 +114,72 @@ QHash<int, QByteArray> ComputerModel::roleNames() const
     names[StatusUnknownRole] = "statusUnknown";
     names[ServerSupportedRole] = "serverSupported";
     names[DetailsRole] = "details";
+    names[UuidRole] = "uuid";
 
     return names;
+}
+
+QVariantList ComputerModel::keyboardMappingSourceKeys() const
+{
+    return KeyboardMappingStore::supportedSourceKeys();
+}
+
+QVariantList ComputerModel::keyboardMappingTargetKeys() const
+{
+    return KeyboardMappingStore::supportedTargetKeys();
+}
+
+QVariantList ComputerModel::getKeyboardMappings(const QString& hostUuid) const
+{
+    QVariantList result;
+    for (const KeyboardMapping& mapping : KeyboardMappingStore::load(hostUuid)) {
+        QVariantMap item;
+        item.insert(QStringLiteral("sourceKey"), static_cast<int>(mapping.sourceKey));
+        item.insert(QStringLiteral("sourceModifiers"), mapping.sourceModifiers);
+        item.insert(QStringLiteral("targetKey"), static_cast<int>(mapping.targetKey));
+        item.insert(QStringLiteral("targetModifiers"), mapping.targetModifiers);
+        result.append(item);
+    }
+    return result;
+}
+
+QVariantMap ComputerModel::getHostKeyboardSettings(const QString& hostUuid) const
+{
+    const HostKeyboardSettings settings = KeyboardMappingStore::loadHostSettings(hostUuid);
+    return {
+        {QStringLiteral("macFunctionKeysOnFocus"), settings.macFunctionKeysOnFocus},
+        {QStringLiteral("disableMacCapsLock"), settings.disableMacCapsLock},
+        {QStringLiteral("macJapaneseInputKeys"), settings.macJapaneseInputKeys}
+    };
+}
+
+bool ComputerModel::saveKeyboardConfiguration(const QString& hostUuid,
+                                              const QVariantList& mappings,
+                                              const QVariantMap& hostSettings) const
+{
+    QList<KeyboardMapping> parsedMappings;
+    for (const QVariant& item : mappings) {
+        const QVariantMap map = item.toMap();
+        KeyboardMapping mapping = {
+            static_cast<SDL_Scancode>(map.value(QStringLiteral("sourceKey")).toInt()),
+            map.value(QStringLiteral("sourceModifiers")).toInt(),
+            static_cast<SDL_Scancode>(map.value(QStringLiteral("targetKey")).toInt()),
+            map.value(QStringLiteral("targetModifiers")).toInt()
+        };
+        parsedMappings.append(mapping);
+    }
+
+    HostKeyboardSettings parsedHostSettings;
+    parsedHostSettings.macFunctionKeysOnFocus =
+        hostSettings.value(QStringLiteral("macFunctionKeysOnFocus")).toBool();
+    parsedHostSettings.disableMacCapsLock =
+        hostSettings.value(QStringLiteral("disableMacCapsLock")).toBool();
+    parsedHostSettings.macJapaneseInputKeys =
+        hostSettings.value(QStringLiteral("macJapaneseInputKeys")).toBool();
+
+    return KeyboardMappingStore::saveConfiguration(hostUuid,
+                                                   parsedMappings,
+                                                   parsedHostSettings);
 }
 
 Session* ComputerModel::createSessionForCurrentGame(int computerIndex)
@@ -139,6 +207,8 @@ void ComputerModel::deleteComputer(int computerIndex)
     Q_ASSERT(computerIndex >= 0 && computerIndex < m_Computers.count());
 
     beginRemoveRows(QModelIndex(), computerIndex, computerIndex);
+
+    KeyboardMappingStore::remove(m_Computers[computerIndex]->uuid);
 
     // m_Computer[computerIndex] will be deleted by this call
     m_ComputerManager->deleteHost(m_Computers[computerIndex]);

@@ -13,6 +13,10 @@
 
 #ifdef Q_OS_DARWIN
 #include "macfunctionkeymode.h"
+#include "maccapslockmode.h"
+#include "maccapslockmapping.h"
+#include "maccapslockkeycapture.h"
+#include "macjapaneseinputkeycapture.h"
 #endif
 
 class SupportedVideoFormatList : public QList<int>
@@ -263,6 +267,13 @@ private:
     QQuickWindow* m_QtWindow;
 #ifdef Q_OS_DARWIN
     MacFunctionKeyMode m_MacFunctionKeyMode;
+    MacCapsLockMode m_MacCapsLockMode;
+    MacCapsLockMapping m_MacCapsLockMapping;
+    MacCapsLockKeyCapture m_MacCapsLockKeyCapture;
+    bool m_MacCapsLockKeyCaptureEnabled;
+    MacJapaneseInputKeyCapture m_MacJapaneseInputKeyCapture;
+    bool m_MacFunctionKeysOnFocus;
+    bool m_DisableMacCapsLock;
 #endif
     bool m_UnexpectedTermination;
     SdlInputHandler* m_InputHandler;

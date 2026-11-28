@@ -66,6 +66,30 @@ CONNECTION_LISTENER_CALLBACKS Session::k_ConnCallbacks = {
 Session* Session::s_ActiveSession;
 QSemaphore Session::s_ActiveSessionSemaphore(1);
 
+#ifdef Q_OS_DARWIN
+static SDL_Scancode macCapsLockModifierTarget(const QString& hostUuid)
+{
+    SDL_Scancode targetKey = SDL_SCANCODE_UNKNOWN;
+    int capsLockMappings = 0;
+    const QList<KeyboardMapping> mappings = KeyboardMappingStore::load(hostUuid);
+    for (const KeyboardMapping& mapping : mappings) {
+        if (mapping.sourceKey != SDL_SCANCODE_CAPSLOCK) {
+            continue;
+        }
+
+        capsLockMappings++;
+        if (mapping.sourceModifiers != 0 ||
+                mapping.targetModifiers != 0 ||
+                KeyboardMappingStore::modifierForScancode(mapping.targetKey) == 0) {
+            return SDL_SCANCODE_UNKNOWN;
+        }
+        targetKey = mapping.targetKey;
+    }
+
+    return capsLockMappings == 1 ? targetKey : SDL_SCANCODE_UNKNOWN;
+}
+#endif
+
 void Session::clStageStarting(int stage)
 {
     // We know this is called on the same thread as LiStartConnection()
@@ -586,6 +610,12 @@ Session::Session(NvComputer* computer, NvApp& app, StreamingPreferences *prefere
       m_AudioSampleCount(0),
       m_DropAudioEndTime(0)
 {
+#ifdef Q_OS_DARWIN
+    const HostKeyboardSettings hostSettings = KeyboardMappingStore::loadHostSettings(computer->uuid);
+    m_MacFunctionKeysOnFocus = hostSettings.macFunctionKeysOnFocus;
+    m_DisableMacCapsLock = hostSettings.disableMacCapsLock;
+    m_MacCapsLockKeyCaptureEnabled = false;
+#endif
 }
 
 Session::~Session()
@@ -1773,7 +1803,7 @@ void Session::start()
 
     // Initialize the gamepad code with our preferences
     // NB: m_InputHandler must be initialize before starting the connection.
-    m_InputHandler = new SdlInputHandler(*m_Preferences, m_StreamConfig.width, m_StreamConfig.height);
+    m_InputHandler = new SdlInputHandler(*m_Preferences, m_StreamConfig.width, m_StreamConfig.height, m_Computer->uuid);
 
     // Kick off the async connection thread then return to the caller to pump the event loop
     auto thread = new AsyncConnectionStartThread(this);
@@ -1896,9 +1926,31 @@ void Session::exec()
     m_InputHandler->setWindow(m_Window);
 
 #ifdef Q_OS_DARWIN
-    if (m_Preferences->macFunctionKeysOnFocus &&
+    const SDL_Scancode capsLockTarget = macCapsLockModifierTarget(m_Computer->uuid);
+    if (capsLockTarget != SDL_SCANCODE_UNKNOWN) {
+        if (m_MacCapsLockMapping.activate(capsLockTarget)) {
+            // Right Control is a private relay. The input handler consumes it
+            // before normal per-host mappings and emits the configured target.
+            m_InputHandler->setMacHidCapsLockTarget(capsLockTarget);
+        }
+        else {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "Caps Lock HID relay mapping is unavailable; using SDL key mapping");
+        }
+    }
+
+    if (m_MacFunctionKeysOnFocus &&
         (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS)) {
         m_MacFunctionKeyMode.setStreamingActive(true);
+    }
+    if (m_DisableMacCapsLock &&
+        (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS)) {
+        m_MacCapsLockMode.setStreamingActive(true);
+    }
+    if ((SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS) &&
+        !m_MacJapaneseInputKeyCapture.setStreamingActive(true)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Mac Eisu/Kana keys may also change the local input source");
     }
 #endif
 
@@ -2070,19 +2122,30 @@ void Session::exec()
             switch (event.window.event) {
             case SDL_WINDOWEVENT_FOCUS_LOST:
 #ifdef Q_OS_DARWIN
-                if (m_Preferences->macFunctionKeysOnFocus) {
+                if (m_MacFunctionKeysOnFocus) {
                     m_MacFunctionKeyMode.setStreamingActive(false);
                 }
+                if (m_DisableMacCapsLock) {
+                    m_MacCapsLockMode.setStreamingActive(false);
+                }
+                m_MacJapaneseInputKeyCapture.setStreamingActive(false);
 #endif
                 if (m_Preferences->muteOnFocusLoss) {
                     m_AudioMuted = true;
                 }
                 m_InputHandler->notifyFocusLost();
                 break;
-            case SDL_WINDOWEVENT_FOCUS_GAINED:
+            case SDL_WINDOWEVENT_FOCUS_GAINED: {
 #ifdef Q_OS_DARWIN
-                if (m_Preferences->macFunctionKeysOnFocus) {
+                if (m_MacFunctionKeysOnFocus) {
                     m_MacFunctionKeyMode.setStreamingActive(true);
+                }
+                if (m_DisableMacCapsLock) {
+                    m_MacCapsLockMode.setStreamingActive(true);
+                }
+                if (!m_MacJapaneseInputKeyCapture.setStreamingActive(true)) {
+                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                                "Mac Eisu/Kana keys may also change the local input source");
                 }
 #endif
                 if (m_Preferences->muteOnFocusLoss) {
@@ -2090,6 +2153,7 @@ void Session::exec()
                 }
                 m_InputHandler->notifyFocusGained();
                 break;
+            }
             case SDL_WINDOWEVENT_LEAVE:
                 m_InputHandler->notifyMouseLeave();
                 break;
@@ -2282,6 +2346,13 @@ void Session::exec()
         case SDL_KEYUP:
         case SDL_KEYDOWN:
             presence.runCallbacks();
+#ifdef Q_OS_DARWIN
+            if (m_DisableMacCapsLock &&
+                    event.type == SDL_KEYDOWN &&
+                    event.key.keysym.scancode == SDL_SCANCODE_CAPSLOCK) {
+                m_MacCapsLockMode.forceOff();
+            }
+#endif
             m_InputHandler->handleKeyEvent(&event.key);
             break;
         case SDL_MOUSEBUTTONDOWN:
@@ -2344,6 +2415,7 @@ void Session::exec()
 DispatchDeferredCleanup:
 #ifdef Q_OS_DARWIN
     m_MacFunctionKeyMode.setStreamingActive(false);
+    m_MacJapaneseInputKeyCapture.setStreamingActive(false);
 #endif
 
     // Switch back to synchronous logging mode
@@ -2360,6 +2432,11 @@ DispatchDeferredCleanup:
 
     // Raise any keys that are still down
     m_InputHandler->raiseAllKeys();
+
+#ifdef Q_OS_DARWIN
+    m_MacCapsLockMapping.restore();
+    m_MacCapsLockMode.setStreamingActive(false);
+#endif
 
     // Destroy the input handler now. This must be destroyed
     // before allowwing the UI to continue execution or it could

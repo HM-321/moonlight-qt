@@ -208,6 +208,24 @@ CenteredGridView {
                     }
                 }
                 NavigableMenuItem {
+                    text: qsTr("Configure Keyboard")
+                    onTriggered: {
+                        var component = Qt.createComponent("KeyboardMappingView.qml")
+                        if (component.status === Component.Ready) {
+                            var mappingView = component.createObject(stackView, {
+                                "computerModel": pcGrid.computerModel,
+                                "computerUuid": model.uuid,
+                                "computerName": model.name
+                            })
+                            stackView.push(mappingView)
+                        }
+                        else {
+                            errorDialog.text = component.errorString()
+                            errorDialog.open()
+                        }
+                    }
+                }
+                NavigableMenuItem {
                     text: qsTr("Delete PC")
                     onTriggered: {
                         deletePcDialog.pcIndex = index

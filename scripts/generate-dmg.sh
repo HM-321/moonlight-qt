@@ -48,12 +48,20 @@ export LDFLAGS=-flto=thin
 
 echo Configuring the project
 pushd $BUILD_FOLDER
-qmake $SOURCE_ROOT/moonlight-qt.pro QMAKE_APPLE_DEVICE_ARCHS="x86_64 arm64" || fail "Qmake failed!"
+QMAKE_CACHE_ARGS=()
+if command -v ccache >/dev/null 2>&1; then
+  QMAKE_CACHE_ARGS+=("QMAKE_CC=ccache $(xcrun --find clang)")
+  QMAKE_CACHE_ARGS+=("QMAKE_CXX=ccache $(xcrun --find clang++)")
+fi
+qmake $SOURCE_ROOT/moonlight-qt.pro QMAKE_APPLE_DEVICE_ARCHS="x86_64 arm64" "${QMAKE_CACHE_ARGS[@]}" || fail "Qmake failed!"
 popd
 
 echo Compiling Moonlight in $BUILD_CONFIG configuration
 pushd $BUILD_FOLDER
 make -j$(sysctl -n hw.logicalcpu) $(echo "$BUILD_CONFIG" | tr '[:upper:]' '[:lower:]') || fail "Make failed!"
+if command -v ccache >/dev/null 2>&1; then
+  ccache --show-stats
+fi
 popd
 
 echo Saving dSYM file
