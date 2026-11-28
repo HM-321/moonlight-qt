@@ -1407,4 +1407,31 @@
             <translation>Moonlightにフォーカスがある間、英数／かなキーでMacの入力ソースは切り替わりません。英数キーはWindowsの英数モードキー、かなキーはひらがなモードキーとして送信し、変換／無変換キーとしては送信しません。</translation>
         </message>
     </context>
+    <context>
+        <name>KeyboardPicker</name>
+        <message>
+            <source>Select a key</source>
+            <translation>キーを選択</translation>
+        </message>
+        <message>
+            <source>Unavailable keys are dimmed. Key names follow the selected input or output side.</source>
+            <translation>選択できないキーは暗く表示される。キー名は変換元または変換先に応じて表示される。</translation>
+        </message>
+        <message>
+            <source>Other supported keys</source>
+            <translation>その他の対応キー</translation>
+        </message>
+        <message>
+            <source>Select</source>
+            <translation>選択</translation>
+        </message>
+        <message>
+            <source>Select source key</source>
+            <translation>変換元キーを選択</translation>
+        </message>
+        <message>
+            <source>Select target key</source>
+            <translation>変換先キーを選択</translation>
+        </message>
+    </context>
 </TS>

@@ -7,9 +7,10 @@ Dialog {
     modal: true
     focus: true
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-    width: Math.min(parent ? parent.width - 40 : 1160, 1160)
+    width: Math.min(parent ? parent.width - 48 : 1240, 1240)
+    height: Math.min(parent ? parent.height - 48 : 760, 760)
     x: parent ? Math.round((parent.width - width) / 2) : 0
-    y: parent ? Math.max(20, Math.round((parent.height - height) / 2)) : 0
+    y: parent ? Math.round((parent.height - height) / 2) : 0
 
     property var keyOptions: []
     property int selectedCode: 0
@@ -25,9 +26,7 @@ Dialog {
         [43, 20, 26, 8, 21, 23, 28, 24, 12, 18, 19, 47, 48, 49],
         [57, 4, 22, 7, 9, 10, 11, 13, 14, 15, 51, 52, 40],
         [225, 29, 27, 6, 25, 5, 17, 16, 54, 55, 56, 229],
-        [224, 226, 227, 145, 44, 144, 231, 230, 228],
-        [73, 74, 75, -1, 82],
-        [76, 77, 78, 80, 81, 79]
+        [224, 226, 227, 145, 44, 144, 231, 230, 228]
     ]
 
     function optionForCode(code)
@@ -66,29 +65,33 @@ Dialog {
     function keyWidth(code)
     {
         if (code === 44) return 250
-        if (code === 42 || code === 43 || code === 57 || code === 40) return 108
-        if (code === 225 || code === 229) return 125
-        if (code >= 224 && code <= 231) return 105
-        if (code === 144 || code === 145) return 85
-        return 64
+        if (code === 42 || code === 43 || code === 57 || code === 40) return 112
+        if (code === 225 || code === 229) return 132
+        if (code === 227 || code === 231) return 126
+        if (code === 224 || code === 226 || code === 228 || code === 230) return 112
+        if (code === 144 || code === 145) return 105
+        return 68
     }
 
-    contentItem: ScrollView {
-        implicitWidth: 1110
-        implicitHeight: 470
-        clip: true
+    contentItem: ColumnLayout {
+        spacing: 10
 
-        ColumnLayout {
-            width: parent.width
-            spacing: 8
+        Label {
+            text: qsTr("Unavailable keys are dimmed. Key names follow the selected input or output side.")
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: true
+        }
 
-            Label {
-                text: qsTr("Unavailable keys are dimmed. Key names follow the selected input or output side.")
-                wrapMode: Text.WordWrap
-                Layout.fillWidth: true
-            }
+        ScrollView {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            clip: true
 
-            Repeater {
+            ColumnLayout {
+                width: parent.width
+                spacing: 8
+
+                Repeater {
                 model: picker.keyboardRows
 
                 RowLayout {
@@ -119,29 +122,88 @@ Dialog {
                 }
             }
 
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.topMargin: 8
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: 12
+                    spacing: 14
 
-                Label {
-                    text: qsTr("Other supported keys")
-                }
+                    GridLayout {
+                        columns: 3
+                        rowSpacing: 6
+                        columnSpacing: 6
 
-                ComboBox {
-                    id: otherKeys
-                    Layout.fillWidth: true
-                    model: picker.keyOptions
-                    textRole: "name"
-                    Component.onCompleted: currentIndex = picker.optionIndex(picker.selectedCode)
-                }
-
-                Button {
-                    text: qsTr("Select")
-                    enabled: otherKeys.currentIndex >= 0 && picker.keyOptions.length > 0
-                    onClicked: {
-                        picker.keySelected(picker.keyOptions[otherKeys.currentIndex].code)
-                        picker.close()
+                        Repeater {
+                            model: [73, 74, 75, 76, 77, 78]
+                            Button {
+                                Layout.preferredWidth: 92
+                                Layout.preferredHeight: 48
+                                text: picker.keyText(modelData)
+                                enabled: picker.optionForCode(modelData) !== null
+                                highlighted: modelData === picker.selectedCode
+                                onClicked: {
+                                    picker.keySelected(modelData)
+                                    picker.close()
+                                }
+                            }
+                        }
                     }
+
+                    GridLayout {
+                        columns: 3
+                        rowSpacing: 6
+                        columnSpacing: 6
+
+                        Item { Layout.preferredWidth: 68; Layout.preferredHeight: 48 }
+                        Button {
+                            Layout.preferredWidth: 68; Layout.preferredHeight: 48
+                            text: picker.keyText(82); enabled: picker.optionForCode(82) !== null
+                            highlighted: picker.selectedCode === 82
+                            onClicked: { picker.keySelected(82); picker.close() }
+                        }
+                        Item { Layout.preferredWidth: 68; Layout.preferredHeight: 48 }
+                        Button {
+                            Layout.preferredWidth: 68; Layout.preferredHeight: 48
+                            text: picker.keyText(80); enabled: picker.optionForCode(80) !== null
+                            highlighted: picker.selectedCode === 80
+                            onClicked: { picker.keySelected(80); picker.close() }
+                        }
+                        Button {
+                            Layout.preferredWidth: 68; Layout.preferredHeight: 48
+                            text: picker.keyText(81); enabled: picker.optionForCode(81) !== null
+                            highlighted: picker.selectedCode === 81
+                            onClicked: { picker.keySelected(81); picker.close() }
+                        }
+                        Button {
+                            Layout.preferredWidth: 68; Layout.preferredHeight: 48
+                            text: picker.keyText(79); enabled: picker.optionForCode(79) !== null
+                            highlighted: picker.selectedCode === 79
+                            onClicked: { picker.keySelected(79); picker.close() }
+                        }
+                    }
+                }
+            }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.topMargin: 4
+
+            Label { text: qsTr("Other supported keys") }
+
+            ComboBox {
+                id: otherKeys
+                Layout.fillWidth: true
+                model: picker.keyOptions
+                textRole: "name"
+                Component.onCompleted: currentIndex = picker.optionIndex(picker.selectedCode)
+            }
+
+            Button {
+                text: qsTr("Select")
+                enabled: otherKeys.currentIndex >= 0 && picker.keyOptions.length > 0
+                onClicked: {
+                    picker.keySelected(picker.keyOptions[otherKeys.currentIndex].code)
+                    picker.close()
                 }
             }
         }
