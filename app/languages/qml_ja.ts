@@ -1406,6 +1406,14 @@
             <source>While Moonlight is focused, Eisu/Kana will not change the Mac input source. Eisu is sent as the Windows Alphanumeric mode key and Kana as the Hiragana mode key, not Convert/Nonconvert.</source>
             <translation>Moonlightにフォーカスがある間、英数／かなキーでMacの入力ソースは切り替わりません。英数キーはWindowsの英数モードキー、かなキーはひらがなモードキーとして送信し、変換／無変換キーとしては送信しません。</translation>
         </message>
+        <message>
+            <source>Select source key</source>
+            <translation>変換元キーを選択</translation>
+        </message>
+        <message>
+            <source>Select target key</source>
+            <translation>変換先キーを選択</translation>
+        </message>
     </context>
     <context>
         <name>KeyboardPicker</name>

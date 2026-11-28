@@ -8,7 +8,7 @@ Dialog {
     focus: true
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
     width: Math.min(parent ? parent.width - 48 : 1240, 1240)
-    height: Math.min(parent ? parent.height - 48 : 760, 760)
+    height: Math.min(parent ? parent.height - 48 : 700, 700)
     x: parent ? Math.round((parent.width - width) / 2) : 0
     y: parent ? Math.round((parent.height - height) / 2) : 0
 
@@ -58,6 +58,7 @@ Dialog {
 
     function keyText(code)
     {
+        if (code === 41) return "Esc"
         var option = optionForCode(code)
         return option ? option.name : fallbackName(code)
     }
@@ -70,7 +71,7 @@ Dialog {
         if (code === 227 || code === 231) return 126
         if (code === 224 || code === 226 || code === 228 || code === 230) return 112
         if (code === 144 || code === 145) return 105
-        return 68
+        return 64
     }
 
     contentItem: ColumnLayout {
@@ -95,8 +96,10 @@ Dialog {
                 model: picker.keyboardRows
 
                 RowLayout {
-                    spacing: 6
+                    spacing: 5
                     Layout.alignment: Qt.AlignHCenter
+                    Layout.leftMargin: 16
+                    Layout.rightMargin: 16
 
                     Repeater {
                         model: modelData
