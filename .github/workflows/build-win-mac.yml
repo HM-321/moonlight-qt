@@ -99,6 +99,10 @@ jobs:
         env:
           QT_PATH: ${{ runner.workspace }}\Qt\${{ matrix.qt_version }}\msvc2022_arm64\bin
 
+      - name: Compile Japanese translation (macOS)
+        if: runner.os == 'macOS'
+        run: lrelease app/languages/qml_ja.ts -qm app/languages/qml_ja.qm
+
       - name: Build Package
         shell: pwsh
         run: |
