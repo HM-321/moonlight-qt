@@ -65,6 +65,30 @@ Item {
         return 0
     }
 
+    function keyName(options, code)
+    {
+        var index = keyIndex(options, code)
+        return options.length > 0 ? options[index].name : ""
+    }
+
+    function openKeyPicker(row, field, options, code, title)
+    {
+        keyPicker.mappingRow = row
+        keyPicker.mappingField = field
+        keyPicker.keyOptions = options
+        keyPicker.selectedCode = code
+        keyPicker.heading = title
+        keyPicker.open()
+    }
+
+    KeyboardPicker {
+        id: keyPicker
+        parent: root
+        property int mappingRow: -1
+        property string mappingField: ""
+        onKeySelected: root.updateMapping(mappingRow, mappingField, code)
+    }
+
     function updateMapping(row, field, value)
     {
         var updated = mappings.slice()
@@ -234,12 +258,14 @@ Item {
                                     onActivated: root.updateMapping(rowIndex, "sourceModifiers", root.sourceModifierOptions[currentIndex].mask)
                                 }
 
-                                ComboBox {
+                                Button {
                                     Layout.fillWidth: true
-                                    model: root.sourceKeyOptions
-                                    textRole: "name"
-                                    Component.onCompleted: currentIndex = root.keyIndex(root.sourceKeyOptions, mappingData.sourceKey)
-                                    onActivated: root.updateMapping(rowIndex, "sourceKey", root.sourceKeyOptions[currentIndex].code)
+                                    text: root.keyName(root.sourceKeyOptions, mappingData.sourceKey) + "  ▾"
+                                    onClicked: root.openKeyPicker(rowIndex,
+                                                                 "sourceKey",
+                                                                 root.sourceKeyOptions,
+                                                                 mappingData.sourceKey,
+                                                                 qsTr("Select source key"))
                                 }
                             }
 
@@ -259,12 +285,14 @@ Item {
                                     onActivated: root.updateMapping(rowIndex, "targetModifiers", root.targetModifierOptions[currentIndex].mask)
                                 }
 
-                                ComboBox {
+                                Button {
                                     Layout.fillWidth: true
-                                    model: root.targetKeyOptions
-                                    textRole: "name"
-                                    Component.onCompleted: currentIndex = root.keyIndex(root.targetKeyOptions, mappingData.targetKey)
-                                    onActivated: root.updateMapping(rowIndex, "targetKey", root.targetKeyOptions[currentIndex].code)
+                                    text: root.keyName(root.targetKeyOptions, mappingData.targetKey) + "  ▾"
+                                    onClicked: root.openKeyPicker(rowIndex,
+                                                                 "targetKey",
+                                                                 root.targetKeyOptions,
+                                                                 mappingData.targetKey,
+                                                                 qsTr("Select target key"))
                                 }
 
                                 Button {
